@@ -83,10 +83,10 @@ void ES9018_Init(void)
     ES9018_SoftwareReset();
     
     /*
-     * Reg0x01：16bit + I2S，固定 I2S 输入（auto=0，避免误切 SPDIF）。
+     * Reg0x01：32bit + I2S，固定 I2S 输入（auto=0）。
      * MCU 为 I2S 主机，ES9018 作从机接收。
      */
-    ES9018_WriteReg(ES9018_REG_INPUT_CONFIG, 0x00); /* 16bit, I2S, 固定 I2S */
+    ES9018_WriteReg(ES9018_REG_INPUT_CONFIG, 0x80); /* 32bit, I2S, 固定 I2S */
 
     Delay_Ms(1);
     ES9018_WriteReg(0x02, 0x18);
@@ -98,7 +98,7 @@ void ES9018_Init(void)
     ES9018_WriteReg(0x08, 0x10);
     ES9018_WriteReg(0x09, 0x22);
 
-    /* Reg0x0A：从机模式（master_clk_enable=0），BCLK/LRCK 由 MCU 提供 */
+    /* Reg0x0A：从机（master_clk_enable=0），BCLK/LRCK 由 MCU 提供 */
     ES9018_WriteReg(ES9018_REG_MASTER_MODE_CTRL, 0x05);
 
     ES9018_WriteReg(0x0B, 0x02);

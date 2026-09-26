@@ -96,11 +96,13 @@ void TIM1_Init()
 }
 
 /*
- * I2S2 主机发送（16bit）：MCU 出 BCLK/LRCK，发给 ES9018
+ * I2S2 主机发送（32bit）：MCU 出 BCLK/LRCK，发给 ES9018
  *   PB12 WS  → 帧时钟（复用推挽）
  *   PB13 CK  → 位时钟（复用推挽）
  *   PB15 SD  → 串行数据（复用推挽）
  * ES9018 用自己 24.576M 晶振作 MCLK，故 MCK 不输出。
+ *
+ * SPI DATAR 16bit，每个 32bit 样点拆 2 个半字，先高 16 后低 16。
  */
 void I2S2_Init(void)
 {
@@ -108,7 +110,7 @@ void I2S2_Init(void)
     I2S_InitTypeDef  I2S_InitStructure = {
         .I2S_Mode = I2S_Mode_MasterTx,            /* 主机发送 */
         .I2S_Standard = I2S_Standard_Phillips,
-        .I2S_DataFormat = I2S_DataFormat_16b,     /* 16bit */
+        .I2S_DataFormat = I2S_DataFormat_32b,     /* 32bit */
         .I2S_MCLKOutput = I2S_MCLKOutput_Disable,
         .I2S_AudioFreq = I2S_AudioFreq_48k,
         .I2S_CPOL = I2S_CPOL_High
@@ -132,7 +134,7 @@ static uint16_t s_i2s_len;
 
 /*
  * DMA1_CH5 = SPI2_TX，内存 → SPI2.DATAR（发送）
- * 16bit：buf 为 int16 L,R 交错，halfword_count = 帧数 × 2。
+ * 32bit 样点拆成 [hi][lo] 半字流，halfword_count = 样点数 × 2。
  */
 void I2S2_DMA_Init(const uint16_t *buf, uint16_t halfword_count)
 {
