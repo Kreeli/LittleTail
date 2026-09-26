@@ -1,0 +1,18 @@
+# Build outputs
+obj/
+*.elf
+*.hex
+*.map
+*.lst
+*.o
+*.d
+
+# MounRiver / IDE
+.mrs/
+*.mrs-workspace
+.launch/
+launch.json
+
+# OS
+.DS_Store
+Thumbs.db
