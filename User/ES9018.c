@@ -94,7 +94,7 @@ void ES9018_Init(void)
     ES9018_WriteReg(0x04, 0x00);
     ES9018_WriteReg(0x05, 0x68);
     ES9018_WriteReg(0x06, 0x6A);
-    ES9018_WriteReg(ES9018_REG_GENERAL_SETTINGS, 0x80); /* 不 mute */
+    ES9018_WriteReg(ES9018_REG_GENERAL_SETTINGS, 0x80 | ES9018_FILTER_MIN_PHASE); /* 不 mute */
     ES9018_WriteReg(0x08, 0x10);
     ES9018_WriteReg(0x09, 0x22);
 
