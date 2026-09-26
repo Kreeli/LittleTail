@@ -48,6 +48,7 @@ uint8_t ES9018_ReadReg(uint8_t reg){
 
 void ES9018_SoftwareReset(void)
 {
+    u8 temp = ES9018_ReadReg(0x00);
     // 软复位特殊处理：写入后芯片立即复位，不能等待ACK
     while(I2C_GetFlagStatus(I2C2, I2C_FLAG_BUSY) != RESET);
 
@@ -60,45 +61,45 @@ void ES9018_SoftwareReset(void)
     I2C_SendData(I2C2, 0x00);  // 寄存器地址
     while(I2C_GetFlagStatus(I2C2, I2C_FLAG_TXE) == RESET);
 
-    I2C_SendData(I2C2, 0x01);  // 软复位命令
+    I2C_SendData(I2C2, temp | 0x01);  // 软复位命令
     Delay_Ms(1);               // 等待芯片开始复位
 
     I2C_GenerateSTOP(I2C2, ENABLE);
-    Delay_Ms(100);             // 等待复位完成
+    Delay_Ms(1);             // 等待复位完成
 }
 
 void ES9018_HardwareReset(void)
 {
     GPIO_ResetBits(GPIOB, GPIO_Pin_14);  // 拉低复位
-    Delay_Ms(10);
+    Delay_Ms(1);
     GPIO_SetBits(GPIOB, GPIO_Pin_14);    // 拉高释放
-    Delay_Ms(100);
+    Delay_Ms(1);
 }
 
 void ES9018_Init(void)
 {
 
     ES9018_HardwareReset();
-
+    ES9018_SoftwareReset();
+    
     /*
-     * Reg0x01：必须 32bit + I2S，且 auto_input=0（固定 I2S）。
-     * 若 auto_input=11，浮空的 SPDIF 脚可能被误切换，SD 上有数据也不出声。
+     * Reg0x01：16bit + I2S，固定 I2S 输入（auto=0，避免误切 SPDIF）。
+     * MCU 为 I2S 主机，ES9018 作从机接收。
      */
-    ES9018_WriteReg(ES9018_REG_INPUT_CONFIG, 0x80); /* 32bit, I2S, 固定 I2S 输入 */
+    ES9018_WriteReg(ES9018_REG_INPUT_CONFIG, 0x00); /* 16bit, I2S, 固定 I2S */
 
-    Delay_Ms(100);
-    ES9018_WriteReg(0x01, 0x8C);
+    Delay_Ms(1);
     ES9018_WriteReg(0x02, 0x18);
     ES9018_WriteReg(0x03, 0x10);
     ES9018_WriteReg(0x04, 0x00);
     ES9018_WriteReg(0x05, 0x68);
     ES9018_WriteReg(0x06, 0x6A);
-    ES9018_WriteReg(ES9018_REG_GENERAL_SETTINGS, 0x80 | ); /* 不 mute */
+    ES9018_WriteReg(ES9018_REG_GENERAL_SETTINGS, 0x80); /* 不 mute */
     ES9018_WriteReg(0x08, 0x10);
     ES9018_WriteReg(0x09, 0x22);
 
-    /* Reg0x0A：主模式，MCLK/8 → 48kHz（24.576M/8/64） */
-    ES9018_WriteReg(ES9018_REG_MASTER_MODE_CTRL, 0xA5);
+    /* Reg0x0A：从机模式（master_clk_enable=0），BCLK/LRCK 由 MCU 提供 */
+    ES9018_WriteReg(ES9018_REG_MASTER_MODE_CTRL, 0x05);
 
     ES9018_WriteReg(0x0B, 0x02);
     ES9018_WriteReg(0x0C, 0x5A);

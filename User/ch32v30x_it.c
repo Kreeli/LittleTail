@@ -43,7 +43,7 @@ void HardFault_Handler(void)
   }
 }
 
-void TIM1_UP_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
+void TIM1_UP_IRQHandler(void) __attribute__((interrupt()));
 void TIM1_UP_IRQHandler(void)
 {
   static u16 LED_state = 0;
