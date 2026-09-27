@@ -49,7 +49,7 @@ void TIM1_UP_IRQHandler(void)
   static u16 LED_state = 0;
   if(TIM_GetITStatus(TIM1, TIM_IT_Update) == SET)
   {
-    if(LED_state = ~LED_state)
+    if((LED_state = ~LED_state))
       GPIO_SetBits(GPIOC,GPIO_Pin_7);
     else
       GPIO_ResetBits(GPIOC,GPIO_Pin_7);

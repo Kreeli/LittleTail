@@ -8,26 +8,26 @@
  *****************************************************************************/
 #define ES9018_ADDR        0x90
 /*===========================================================================
- * ºƒ¥Ê∆˜µÿ÷∑∂®“Â (p.11)
+ * ÂØÑÂ≠òÂô®Âú∞ÂùÄÂÆö‰πâ (p.11)
  *===========================================================================*/
-/* ∂¡–¥ºƒ¥Ê∆˜ */
+/* ËØªÂÜôÂØÑÂ≠òÂô® */
 #define ES9018_REG_SYSTEM_SETTINGS        0x00  /* osc_drv, soft_reset */
 #define ES9018_REG_INPUT_CONFIG           0x01  /* i2s_length, i2s_mode, input_select */
-#define ES9018_REG_RESERVED_02            0x02  /* RESERVED, ƒ¨»œ 0x18, Œ∏ƒ */
-#define ES9018_REG_RESERVED_03            0x03  /* RESERVED, ƒ¨»œ 0x10, Œ∏ƒ */
+#define ES9018_REG_RESERVED_02            0x02  /* RESERVED, ÈªòËÆ§ 0x18, ÂãøÊîπ */
+#define ES9018_REG_RESERVED_03            0x03  /* RESERVED, ÈªòËÆ§ 0x10, ÂãøÊîπ */
 #define ES9018_REG_AUTOMUTE_TIME          0x04  /* automute_time */
 #define ES9018_REG_AUTOMUTE_LEVEL         0x05  /* automute_loopback, automute_level */
 #define ES9018_REG_DEEMPH_VOLRATE         0x06  /* deemph, vol_rate */
 #define ES9018_REG_GENERAL_SETTINGS       0x07  /* filter_shape, iir_bw, mute */
 #define ES9018_REG_GPIO_CONFIG            0x08  /* gpio1_cfg, gpio2_cfg */
-#define ES9018_REG_RESERVED_09            0x09  /* RESERVED, ƒ¨»œ 0x00 */
+#define ES9018_REG_RESERVED_09            0x09  /* RESERVED, ÈªòËÆ§ 0x00 */
 #define ES9018_REG_MASTER_MODE_CTRL       0x0A  /* master_clk_enable, clk_div, sync */
 #define ES9018_REG_CHANNEL_MAPPING        0x0B  /* spdif_sel, ch_swap, ch_sel */
 #define ES9018_REG_DPLL_ASRC              0x0C  /* dpll_bw_i2s, dpll_bw_dsd */
 #define ES9018_REG_THD_COMP               0x0D  /* bypass_thd */
 #define ES9018_REG_SOFT_START             0x0E  /* soft_start, mute_on_lock */
-#define ES9018_REG_VOLUME_1               0x0F  /* ◊Û…˘µ¿“Ù¡ø (0=-0dB, 255=-127.5dB) */
-#define ES9018_REG_VOLUME_2               0x10  /* ”“…˘µ¿“Ù¡ø */
+#define ES9018_REG_VOLUME_1               0x0F  /* Â∑¶Â£∞ÈÅìÈü≥Èáè (0=-0dB, 255=-127.5dB) */
+#define ES9018_REG_VOLUME_2               0x10  /* Âè≥Â£∞ÈÅìÈü≥Èáè */
 #define ES9018_REG_MASTER_TRIM_0          0x11  /* Master Trim LSB */
 #define ES9018_REG_MASTER_TRIM_1          0x12  /* Master Trim */
 #define ES9018_REG_MASTER_TRIM_2          0x13  /* Master Trim */
@@ -43,7 +43,7 @@
 #define ES9018_REG_PROG_FILTER_COEFF_2    0x1D
 #define ES9018_REG_PROG_FILTER_CTRL       0x1E
 
-/* ÷ª∂¡ºƒ¥Ê∆˜ */
+/* Âè™ËØªÂØÑÂ≠òÂô® */
 #define ES9018_REG_CHIP_STATUS            0x40  /* chip_id, lock_status, automute_status */
 #define ES9018_REG_GPIO_STATUS            0x41
 #define ES9018_REG_DPLL_RATIO_0           0x42  /* DPLL ratio LSB */
@@ -52,7 +52,7 @@
 #define ES9018_REG_DPLL_RATIO_3           0x45  /* DPLL ratio MSB */
 
 /*===========================================================================
- * SYSTEM SETTINGS (Reg 0x00) Œª∂®“Â (p.12)
+ * SYSTEM SETTINGS (Reg 0x00) ‰ΩçÂÆö‰πâ (p.12)
  *===========================================================================*/
 #define ES9018_OSC_DRV_FULL               (0 << 4)
 #define ES9018_OSC_DRV_3_4                (8 << 4)
@@ -60,14 +60,14 @@
 #define ES9018_OSC_DRV_1_4                (14 << 4)
 #define ES9018_OSC_DRV_SHUTDOWN           (15 << 4)
 #define ES9018_SOFT_RESET                 (1 << 0)
-/* ◊¢“‚: Reg 0 µƒ bit[3:1]  « RESERVED, ±ÿ–Î–¥ 0 */
+/* Ê≥®ÊÑè: Reg 0 ÁöÑ bit[3:1] ÊòØ RESERVED, ÂøÖÈ°ªÂÜô 0 */
 
 /*===========================================================================
- * INPUT CONFIG (Reg 0x01) Œª∂®“Â (p.12)
+ * INPUT CONFIG (Reg 0x01) ‰ΩçÂÆö‰πâ (p.12)
  *===========================================================================*/
 #define ES9018_I2S_LENGTH_16BIT           (0 << 6)
 #define ES9018_I2S_LENGTH_24BIT           (1 << 6)
-#define ES9018_I2S_LENGTH_32BIT           (2 << 6)  /* 2'd2 ªÚ 2'd3 */
+#define ES9018_I2S_LENGTH_32BIT           (2 << 6)  /* 2'd2 Êàñ 2'd3 */
 #define ES9018_I2S_MODE_I2S               (0 << 4)
 #define ES9018_I2S_MODE_LJ                (1 << 4)
 #define ES9018_AUTO_INPUT_NORMAL          (0 << 2)
@@ -79,7 +79,7 @@
 #define ES9018_INPUT_SEL_DSD              (3)
 
 /*===========================================================================
- * GENERAL SETTINGS (Reg 0x07) Œª∂®“Â (p.14)
+ * GENERAL SETTINGS (Reg 0x07) ‰ΩçÂÆö‰πâ (p.14)
  *===========================================================================*/
 #define ES9018_FILTER_FAST_ROLLOFF        (0 << 5)
 #define ES9018_FILTER_SLOW_ROLLOFF        (1 << 5)
@@ -91,10 +91,10 @@
 #define ES9018_MUTE_CH1                   (1 << 0)
 #define ES9018_MUTE_CH2                   (1 << 1)
 #define ES9018_MUTE_BOTH                  (3 << 0)
-/* ◊¢“‚: Reg 7 bit[7] ∫Õ bit[4]  « RESERVED, ±ÿ–Î–¥ 0 */
+/* Ê≥®ÊÑè: Reg 7 bit[7] Âíå bit[4] ÊòØ RESERVED, ÂøÖÈ°ªÂÜô 0 */
 
 /*===========================================================================
- * MASTER MODE CONTROL (Reg 0x0A) Œª∂®“Â (p.16)
+ * MASTER MODE CONTROL (Reg 0x0A) ‰ΩçÂÆö‰πâ (p.16)
  *===========================================================================*/
 #define ES9018_MASTER_CLK_EN              (1 << 7)
 #define ES9018_CLK_DIV_MCLK_4             (0 << 5)
@@ -103,25 +103,26 @@
 #define ES9018_SYNC_MODE                  (1 << 4)
 
 /*===========================================================================
- * SOFT START (Reg 0x0E) Œª∂®“Â (p.19)
+ * SOFT START (Reg 0x0E) ‰ΩçÂÆö‰πâ (p.19)
  *===========================================================================*/
 #define ES9018_SOFT_START_EN              (1 << 7)
 #define ES9018_SOFT_START_ON_LOCK         (1 << 6)
 #define ES9018_MUTE_ON_LOCK               (1 << 5)
 
 /*===========================================================================
- * ∫Ø ˝…˘√˜
+ * ÂáΩÊï∞Â£∞Êòé
  *===========================================================================*/
 void     ES9018_WriteReg(uint8_t reg, uint8_t value);
 uint8_t  ES9018_ReadReg(uint8_t reg);
 
 void     ES9018_Init(void);
 void     ES9018_SoftwareReset(void);
+void ES9018_HardwareReset(void);
 
-void     ES9018_SetVolume(uint8_t vol);       /* ◊Û”“…˘µ¿…ËŒ™œ‡Õ¨÷µ */
-void     ES9018_SetVolumeL(uint8_t vol);      /* ◊Û…˘µ¿ 0=-0dB, 255=-127.5dB */
-void     ES9018_SetVolumeR(uint8_t vol);      /* ”“…˘µ¿ */
-void     ES9018_Mute(uint8_t mute);           /* bit0=◊Û, bit1=”“ */
+void     ES9018_SetVolume(uint8_t vol);       /* Â∑¶Âè≥Â£∞ÈÅìËÆæ‰∏∫Áõ∏ÂêåÂÄº */
+void     ES9018_SetVolumeL(uint8_t vol);      /* Â∑¶Â£∞ÈÅì 0=-0dB, 255=-127.5dB */
+void     ES9018_SetVolumeR(uint8_t vol);      /* Âè≥Â£∞ÈÅì */
+void     ES9018_Mute(uint8_t mute);           /* bit0=Â∑¶, bit1=Âè≥ */
 void     ES9018_SetFilterShape(uint8_t shape);
 void     ES9018_SetInputSelect(uint8_t sel);
 void     ES9018_SetI2SFormat(uint8_t length, uint8_t mode);

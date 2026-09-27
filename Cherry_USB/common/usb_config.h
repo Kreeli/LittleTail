@@ -13,11 +13,13 @@
 
 #define CONFIG_USB_PRINTF(...) rt_kprintf(__VA_ARGS__)
 #else
-#define CONFIG_USB_PRINTF(...) printf(__VA_ARGS__)
+/* USART_Printf_Init is not called in this project; blocking printf inside
+ * USB IRQ would deadlock. Keep USB logs silent until a real console exists. */
+#define CONFIG_USB_PRINTF(...) ((void)0)
 #endif
 
 #ifndef CONFIG_USB_DBG_LEVEL
-#define CONFIG_USB_DBG_LEVEL USB_DBG_INFO
+#define CONFIG_USB_DBG_LEVEL USB_DBG_ERROR
 #endif
 
 /* Enable print with color */
@@ -313,7 +315,7 @@
  *
  * in xxx32 chips, only pb14/pb15 can support hs mode, pa11/pa12 is not supported(only a few supports, but we ignore them).
 */
-// #define CONFIG_USB_HS
+#define CONFIG_USB_HS
 
 #ifndef usb_phyaddr2ramaddr
 #define usb_phyaddr2ramaddr(addr) (addr)
