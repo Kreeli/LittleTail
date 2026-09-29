@@ -58,8 +58,8 @@ int main(void)
 	Sine_BuildTx();
 	I2S2_DMA_Init(i2s_tx_buf, SINE_TX_LEN);
 	I2S2_DMA_Start();
-	ES9018_SetVolume(0);
-	USB_CDC_init();
+	ES9018_SetVolume(40);
+	USB_init();
 
 	while (1) {
 		printf("hello\n");
