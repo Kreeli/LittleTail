@@ -129,5 +129,5 @@ void     ES9018_SetI2SFormat(uint8_t length, uint8_t mode);
 
 uint8_t  ES9018_ReadChipStatus(void);
 uint8_t  ES9018_ReadLockStatus(void);
-
+void ES9018_SetBitCLKDIV(uint8_t div);
 #endif /* __ES9018_H */

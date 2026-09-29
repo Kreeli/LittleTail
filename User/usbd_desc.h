@@ -43,19 +43,26 @@ uint8_t conf_desc[] = {
         0x00
     ),
     //IAD + 控制interface的描述符 + Header
-    AUDIO_AC_DESCRIPTOR_INIT(
+    AUDIO_V2_AC_DESCRIPTOR_INIT(
         0x02,//接口号0x02
         0x02,//两个interface,control和DATA
         9+12+9 + 10,///从header到终端的长度
-        0x03,//字符串
-        0x03//bainterfaceNr 每个音频流interface从哪里开始 第一个音频interface是0x03,这里可以填多个*/
-    ),
+        0x01,//bcatagory
+        0x00,//这个没看懂，什么非可寻址控制功能的操作类型
+        0x03//字符串
+    )
     //输入终端
     AUDIO_AC_INPUT_TERMINAL_DESCRIPTOR_INIT(
         0x01,//AS ID
         0x0101,//USB stream是输入终端
         0x02,//双声道
         0x0003//左右立体声
+    ),
+    //时钟源终端
+    AUDIO_V2_AC_CLOCK_SOURCE_DESCRIPTOR_INIT(
+        0x01, /* bClockID */
+        0x00, /* bmAttributes */
+        0x03  /* bmControls */
     ),
     AUDIO_AC_FEATURE_UNIT_DESCRIPTOR_INIT(
         0x03,                   // bUnitID

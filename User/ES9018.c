@@ -86,9 +86,7 @@ void ES9018_Init(void)
      * Reg0x01：32bit + I2S，固定 I2S 输入（auto=0）。
      * MCU 为 I2S 主机，ES9018 作从机接收。
      */
-    ES9018_WriteReg(ES9018_REG_INPUT_CONFIG, 0x80); /* 32bit, I2S, 固定 I2S */
-
-    Delay_Ms(1);
+    ES9018_WriteReg(ES9018_REG_INPUT_CONFIG, 0xF0); /* 32bit, LJmode I2S, 固定 I2S */
     ES9018_WriteReg(0x02, 0x18);
     ES9018_WriteReg(0x03, 0x10);
     ES9018_WriteReg(0x04, 0x00);
@@ -96,10 +94,9 @@ void ES9018_Init(void)
     ES9018_WriteReg(0x06, 0x4A);
     ES9018_WriteReg(ES9018_REG_GENERAL_SETTINGS, 0x80 | ES9018_FILTER_SLOW_ROLLOFF); /* 不 mute */
     ES9018_WriteReg(0x08, 0x10);
-    ES9018_WriteReg(0x09, 0x22);
 
-    /* Reg0x0A：从机（master_clk_enable=0），BCLK/LRCK 由 MCU 提供 */
-    ES9018_WriteReg(ES9018_REG_MASTER_MODE_CTRL, 0x05);
+    /* Reg0x0A：从机（master_clk_enable=1），BCLK/LRCK 由 ES9018 提供 stop div = 16384 */
+    ES9018_WriteReg(ES9018_REG_MASTER_MODE_CTRL, 0xA0);
 
     ES9018_WriteReg(0x0B, 0x02);
     ES9018_WriteReg(0x0C, 0x5A);
@@ -174,4 +171,23 @@ uint8_t ES9018_ReadChipStatus(void)
 uint8_t ES9018_ReadLockStatus(void)
 {
     return (ES9018_ReadReg(ES9018_REG_CHIP_STATUS) & 1);
+}
+
+void ES9018_SetBitCLKDIV(uint8_t div){
+    u8 val = ES9018_ReadReg(ES9018_REG_MASTER_MODE_CTRL) & 0b10011111;
+    switch(div)
+    {
+        case 4:
+            ES9018_WriteReg(ES9018_REG_MASTER_MODE_CTRL, val | ES9018_CLK_DIV_MCLK_4); 
+            break;
+        case 8:
+            ES9018_WriteReg(ES9018_REG_MASTER_MODE_CTRL, val | ES9018_CLK_DIV_MCLK_8); 
+            break;
+        case 16:
+            ES9018_WriteReg(ES9018_REG_MASTER_MODE_CTRL, val | ES9018_CLK_DIV_MCLK_16); 
+            break;
+        default:
+            ES9018_WriteReg(ES9018_REG_MASTER_MODE_CTRL, val | ES9018_CLK_DIV_MCLK_4); 
+            break;
+    }
 }

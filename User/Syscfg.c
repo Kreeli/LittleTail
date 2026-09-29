@@ -4,6 +4,7 @@ void Syscfg(void){
 	I2C2_init();
 	ES9018_RST_Init();
 	HP_AMP_RST_Init();
+    //I2S2_ClockInit();
 	I2S2_Init();
     TIM1_Init();
 }
@@ -103,11 +104,36 @@ void TIM1_Init()
  *
  * SPI DATAR 16bit，每个 32bit 样点拆 2 个半字，先高 16 后低 16。
  */
+// void I2S2_Init(void)
+// {
+//     GPIO_InitTypeDef GPIO_InitStructure = {0};
+//     I2S_InitTypeDef  I2S_InitStructure = {
+//         .I2S_Mode = I2S_Mode_MasterTx,            /* 主机发送 */
+//         .I2S_Standard = I2S_Standard_Phillips,
+//         .I2S_DataFormat = I2S_DataFormat_32b,     /* 32bit */
+//         .I2S_MCLKOutput = I2S_MCLKOutput_Disable,
+//         .I2S_AudioFreq = I2S_AudioFreq_96k,
+//         .I2S_CPOL = I2S_CPOL_High
+//     };
+
+//     RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE);
+//     RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO | RCC_APB2Periph_GPIOB, ENABLE);
+
+//     /* WS/CK/SD：主机全部输出 */
+//     GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_12 | GPIO_Pin_13 | GPIO_Pin_15;
+//     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
+//     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+//     GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+//     SPI_I2S_DeInit(SPI2);
+//     I2S_Init(SPI2, &I2S_InitStructure);
+// }
+
 void I2S2_Init(void)
 {
     GPIO_InitTypeDef GPIO_InitStructure = {0};
     I2S_InitTypeDef  I2S_InitStructure = {
-        .I2S_Mode = I2S_Mode_MasterTx,            /* 主机发送 */
+        .I2S_Mode = I2S_Mode_SlaveTx,            /* 主机发送 */
         .I2S_Standard = I2S_Standard_Phillips,
         .I2S_DataFormat = I2S_DataFormat_32b,     /* 32bit */
         .I2S_MCLKOutput = I2S_MCLKOutput_Disable,
@@ -118,15 +144,30 @@ void I2S2_Init(void)
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE);
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO | RCC_APB2Periph_GPIOB, ENABLE);
 
-    /* WS/CK/SD：主机全部输出 */
-    GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_12 | GPIO_Pin_13 | GPIO_Pin_15;
-    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
+    /* WS/CK：主机入 */
+    GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_12 | GPIO_Pin_13;
+    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IPD;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_Init(GPIOB, &GPIO_InitStructure);
 
-    SPI_I2S_DeInit(SPI2);
+    GPIO_InitStructure.GPIO_Pin   =  GPIO_Pin_15;
+    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
+    GPIO_Init(GPIOB, &GPIO_InitStructure);
+
     I2S_Init(SPI2, &I2S_InitStructure);
 }
+
+void I2S2_ClockInit(void)
+{
+    uint32_t guard = 1000000u;
+    RCC_PREDIV2Config(RCC_PREDIV2_Div1); /* 8MHz / 1 = 8MHz */
+    RCC_PLL3Config(RCC_PLL3Mul_10);      /* VCO = 8MHz * 10 = 80MHz */
+    RCC_PLL3Cmd(ENABLE);
+    while ((RCC_GetFlagStatus(RCC_FLAG_PLL3RDY) == RESET) && (guard-- != 0u)) {
+    }
+    RCC_I2S2CLKConfig(RCC_I2S2CLKSource_PLL3_VCO);
+}
+
 
 static const uint16_t *s_i2s_buf;
 static uint16_t s_i2s_len;
