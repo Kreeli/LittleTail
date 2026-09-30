@@ -1,0 +1,2076 @@
+                                                                                                    ES9018K2M
+                                                             32-bit Stereo Low Power Audio DAC
+ Analog Reinvented                                                                    Datasheet
+
+  The ES9018K2M SABRE32 Reference DAC is a high-performance 32-bit, 2-channel audio D/A converter
+  targeted for audiophile-grade portable power sensitive applications such as digital music players, consumer
+  applications such as Blu-ray players, audio pre-amplifiers and A/V receivers, as well as professional applications
+  such as recording systems, mixer consoles and digital audio workstations.
+  Using the critically acclaimed ESS patented 32-bit HyperStream™ DAC architecture, SABRE SOUND®
+  technology, and Time Domain Jitter Eliminator, the ES9018K2M SABRE32 Reference DAC delivers a DNR of
+  up to 127dB and THD+N of –120dB, a performance level that will satisfy the most demanding audio enthusiasts.
+  The ES9018K2M SABRE32 Reference DAC’s 32-bit HyperStream™ architecture can handle up to 32-bit,
+  384kHz PCM data via I2S, DSD-11.2MHz data as well as mono mode for highest performance applications.
+  Both synchronous and ASRC (asynchronous sample rate conversion) modes are supported.
+  The ES9018K2M SABRE32 Reference DAC comes in 28-QFN package and typically consumes 52mW in
+  normal operating mode (< 1mW in standby mode).
+  The ES9018K2M SABRE32 Reference DAC sets the standard for HD audio performance, in an easy-to-use
+  form factor for today’s most demanding digital-audio applications.
+
+
+   FEATURE                                         DESCRIPTION
+  Patented 32-bit HyperStream™ DAC                o   Industry’s highest performance 32-bit mobile audio DAC with
+  o +127dB DNR                                        unprecedented dynamic range and ultra-low distortion
+  o –120dB THD+N                                  o   Supports both synchronous and ASRC (asynchronous
+                                                      sample rate converter) modes
+  Patented Time Domain Jitter Eliminator          o   Unmatched audio clarity free from input clock jitter
+  SABRE SOUND® technology                         o   HD Audio Performance
+  64-bit accumulator and 32-bit processing        o   Distortion free signal processing
+  Integrated DSP Functions                        o   Click-free soft mute and volume control
+                                                  o   Programmable Zero detect
+                                                  o   De-emphasis for 32kHz, 44.1kHz, and 48kHz sampling
+  Customizable output configuration               o   Mono or stereo output in current or voltage mode based on
+                                                      performance criterion
+  I2C control                                     o   Allows software control of DAC features
+  28-QFN (5mm x 5mm) package                      o   Minimizes PCB footprint
+  52mW typical operating power                    o   Maximizes battery life
+  < 1mW standby power
+  Versatile digital input                         o   Supports SPDIF, PCM (I2S, LJ 16-32-bit) or DSD input
+  Customizable filter characteristics             o   User-programmable filter allowing custom roll-off response
+                                                  o   By-passable oversampling filter
+
+APPLICATIONS
+• Mobile phones / Tablets / Digital music players / Portable multimedia players
+• Blu-ray / SACD / DVD-Audio player
+• Audio preamplifier and A/V receiver
+• Professional audio recording systems / Mixing consoles / Digital audio workstation
+
+       ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com
+ 3.7                                                                                                                                                       April 22, 2021
+
+
+                                                                                                                               ES9018K2M Datasheet
+
+FUNCTIONAL BLOCK DIAGRAM
+
+
+
+
+                                       RESETB
+
+
+
+
+                                                                           GPIO1
+                                                                                   GPIO2
+                                                        SDA
+                                                              SCL
+                                        CONTROL INTERFACE
+                                                                                                            ES9018K2M
+                                       OVERSAMPLING FILTER
+                                                Fast/Slow roll-off (PCM)                     ASRC
+                             PCM /                                                             &
+              DATA[2:1]                           50/60/70kHz (DSD)                                            32-bit           Dynamic     DACL, DACR
+                             DSD /               De-emphasis (PCM)                           Jitter
+             DATA_CLK        SPDIF                                                                         HyperstreamTM        Matching
+                                                    Volume Control                         Reduction                                        DACLB, DACRB
+                           Interface                                                                         DAC (2x)             (2x)
+                                                       Soft Mute
+                                                      Zero Detect                            DPLL
+
+
+
+                                                                                                  Core & IO                    DAC
+              XI / MCLK      OSC                                      Core
+                                                                     Voltage                    Power Supply                Power Supply
+                     XO
+
+
+                            VCCA                                                   DVDD         DVCC                       AVCC_L, AVCC_R
+                            (3.3V)                                                            (1.8/3.3V)    GND                (3.3V)
+
+
+
+
+TYPICAL APPLICATION DIAGRAM
+
+
+
+
+   ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com                                                         2
+ April 22, 2021                                                                                                     3.7
+
+
+ES9018K2M Datasheet
+
+PIN LAYOUT
+
+
+
+
+                                         DATA_CLK
+                                         RESETB
+
+                                         DATA1
+                                         DATA2
+                                         GPIO1
+                                         GPIO2
+                                         N.C.
+                                         28
+                                         27
+                                         26
+                                         25
+                                         24
+                                         23
+                                         22
+              DGND               1                                       21          DVDD
+               N.C.              2                                       20          DGND
+               SCL               3          ES9018K2M                    19          N.C.
+               SDA               4                                       18          DVCC
+              ADDR               5            28-QFN                     17          VCCA
+                XO               6                                       16          AVCC_R
+          XI (MCLK)              7                                       15          AVCC_L
+                                         10
+                                         11
+                                         12
+                                         13
+                                         14
+                                          8
+                                          9DACR
+                                           AGND
+
+                                          DACRB
+                                         AGND_R
+
+                                           DACL
+                                          DACLB
+                                         AGND_L
+
+
+
+
+    3       ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com
+  3.7                                                                                                        April 22, 2021
+
+
+                                                                                    ES9018K2M Datasheet
+
+PIN DESCRIPTIONS
+                                              Reset
+    Pin         Name         Pin Type                    Pin Description
+                                              State
+        1       DGND          Ground         Ground      Digital Ground
+        2        N.C.             -              -       No internal connection. Pin may be grounded if desired.
+        3        SCL              I         Tri-stated   I2C Serial Clock Input
+        4        SDA            I/O         Tri-stated   I2C Serial Data Input / Output
+        5       ADDR              I         Tri-stated   I2C Address Select
+        6         XO            AO           Floating    XTAL Output
+        7     XI (MCLK)          AI          Floating    XTAL / MCLK Input
+        8       AGND          Ground         Ground      Analog Ground
+                                            Driven to
+        9       DACR            AO                       Differential Positive Analog Output Right
+                                             ground
+                                            Driven to
+     10        DACRB            AO                       Differential Negative Analog Output Right
+                                             ground
+     11        AGND_R         Ground         Ground      Analog Ground
+     12        AGND_L         Ground         Ground      Analog Ground
+                                            Driven to
+     13         DACL            AO                       Differential Positive Analog Output Left
+                                             ground
+                                            Driven to
+     14         DACLB           AO                       Differential Negative Analog Output Left
+                                             ground
+     15        AVCC_L         Power           Power      Analog AVCC for Left Channel
+     16        AVCC_R         Power           Power      Analog AVCC for Right Channel
+     17         VCCA          Power           Power      Analog +3.3V for OSC
+     18         DVCC          Power           Power      Digital +1.8V to +3.3V
+     19          N.C.            -               -       No internal connection. Pin may be grounded if desired.
+     20         DGND          Ground         Ground      Digital Ground. Internally connected to the Exposed Pad.
+                                                         Digital Core Voltage, nominally +1.2V, is supplied by a regulator
+                               Power                     from DVCC. DVDD must be decoupled with a minimum 2.2F
+     21         DVDD         (Internal /     Power       capacitor to DGND. DVDD needs to be externally supplied for
+                             External)                   high XI / MCLK frequency. Please refer to the section about the
+                                                         DVDD supply on page 7 for additional information.
+     22          N.C.             -              -       No internal connection. Pin may be grounded if desired.
+     23         GPIO2           I/O         Tri-stated   GPIO 2
+     24         GPIO1           I/O         Tri-stated   GPIO 1
+     25         DATA2             I         Tri-stated   DSD Data2 I or PCM Data CH1/CH2 or SPDIF Input 2
+                                                         Master mode off: Input for DSD Data1 (L) or PCM Frame Clock
+     26         DATA1           I/O         Tri-stated   or SPDIF Input 3
+                                                         Master mode on: Output for PCM Frame Clock
+                                                         Master mode off: Input for PCM Bit Clock OR DSD Bit Clock OR
+     27       DATA_CLK          I/O         Tri-stated   SPDIF Input 1
+                                                         Master mode on: Output for PCM Bit Clock
+     28        RESETB             I         Tri-stated   Master Reset / Power Down (active low)
+  Exposed
+                DGND          Ground         Ground      The exposed pad must be connected to Digital Ground
+    Pad
+
+Notes:
+-  There are 3 N.C. (No Connect) pins. If desired, these pins can be connected to ground on the PCB to strengthen the
+   otherwise isolated pin pads. Alternatively the N.C. pins can be used to route signals to simplify PCB layout.
+-  The exposed pad must be connected to digital ground.
+
+
+
+     ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com         4
+  April 22, 2021                                                                                                          3.7
+
+
+ ES9018K2M Datasheet
+
+FUNCTIONAL DESCRIPTION
+NOTATATIONS for Sampling Rates
+
+ Mode                                           fs (target sample rate)          FSR (raw sample rate)
+ DSD                                            DATA_CLK / 64                    DSD data rate
+ Serial (PCM) Normal Mode                       Frame Clock Rate                 Frame Clock Rate
+ Serial (PCM) OSF Bypass Mode                   Frame Clock Rate / 8             Frame Clock Rate
+ SPDIF                                          SPDIF Sampling Rate              SPDIF Sampling Rate
+
+PCM, SPDIF and DSD Pin Connections
+PCM Audio Format
+Notes:
+XI clock (MCLK) must be > 192 x FSR when using PCM input (normal mode), or 128 x FSR (synchronous MCLK).
+XI clock (MCLK) must be > 24 x FSR when using PCM input (OSF bypass mode).
+
+ Pin Name           Description
+ DATA1              Frame clock
+ DATA2              2-channel PCM serial data
+ DATA_CLK           Bit clock for PCM audio format
+
+         Master Mode (32-bit data only)
+         When Register #1 ‘input_select’ is set to 2’d0 (I2S) and ‘i2s_length’ is set to 2’d2 (32-bit), the DAC can become a
+         master for Bit Clock and Frame Clock by setting Register #9 ‘master clock enable’ to 1’b1. The Bit Clock frequency
+         can be configured to MCLK / 4, MCLK / 8 or MCLK / 16 by setting Register #9 ‘clock divider select’ to 2’b00, 2’b01 or
+         2’b10. GPIO 1 (or 2) can be configured to output MCLK by setting Register #8 gpio1_cfg (or gpio2_cfg) to 4’d3.
+                                   SLAVE PCM MODE                            MASTER PCM MODE
+
+                                    ES901xK2M                                 ES901xK2M
+
+                BCLK (Bit Clock)    DATA_CLK              BCLK (Bit Clock)    DATA_CLK
+           LRCLK (Frame Clock)      DATA1             LRCLK (Frame Clock)     DATA1
+           SIN (Serial PCM Data)    DATA2            SIN (Serial PCM Data)    DATA2
+                                                      MCLK (Master Clock)     GPIO1
+
+
+SPDIF Audio Formant
+Note: XI clock (MCLK) must be > 386 x FSR when using SPDIF input.
+
+Up to 5 SPDIF inputs can be connected to the 5-to-1 mux, selectable via register “spdif_sel”.
+
+ Pin Name           Description
+ GPIO2              SPDIF input 5
+ GPIO1              SPDIF input 4
+ DATA1              SPDIF input 3
+ DATA2              SPDIF input 2
+ DATA_CLK           SPDIF input 1
+
+DSD Audio Format
+Note: XI clock (MCLK) must be > 3 x FSR when using DSD input.
+
+ Pin Name           Description
+ DATA[1:2]          2-channel DSD data input
+ DATA_CLK           Bit clock for DSD data input
+
+
+
+
+     5         ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com
+  3.7                                                                                                           April 22, 2021
+
+
+                                                                                      ES9018K2M Datasheet
+
+FEATURE DESCRIPTIONS
+Soft Mute
+When Mute is asserted the output signal will ramp to the - level. When Mute is reset the attenuation level will ramp back up
+to the previous level set by the volume control register. Asserting Mute will not change the value of the volume control
+register. The ramp rate is 0.0078125 x fs / 2(vol_rate-5) dB/s.
+
+Automute
+During an automute condition the ramping of the volume of each DAC to - can now be programmatically enabled or
+disabled.
+o In PCM serial mode, “AUTOMUTE” will become active once the audio data is continuously below the threshold set by
+    <Register Automute_lev>, for a length of time defined by 2096896 / (<Register#4> x 64 x fs) Seconds.
+o In SPDIF mode, “AUTOMUTE” will become active once the audio data is continuously below the threshold set by
+    <Register Automute_lev>, for a length of time defined by 2096896 / (<Register#4> x 64 x fs Seconds.
+o In the DSD Mode, “AUTOMUTE” will become active when any 8 consecutive values in the DSD stream have as many 1’s
+    and 0’s for a length of time defined by 2096896 / (<Register Automute_time> x DATA_CLK) seconds. The following
+    table summarizes the conditions.
+
+ Mode      Detection Condition                 Time
+           Data is continuously lower than
+ PCM                                           2096896 / (<Register Automute_time > x 64 x fs)
+           <Register Automute_lev >
+           Data is continuously lower than
+ SPDIF                                         2096896 / (<Register Automute_time > x (64 x fs))
+           <Register Automute_lev >
+           Equal number of 1s and 0s in
+ DSD                                           2096896 / (<Register Automute_time > x DATA_CLK)
+           every 8 bits of data
+
+Volume Control
+Each output channel has its own attenuation circuit. The attenuation for each channel is controlled independently. Each
+channel can be attenuated from 0dB to –127dB in 0.5dB steps.
+Each 0.5dB step transition takes up to 64 intermediate levels, depending on the vol_rate register setting. The result being
+that the level changes are done using small enough steps so that no switching noise occurs during the transition of the
+volume control. When a new volume level is set, the attenuation circuit will ramp softly to the new level.
+
+Master Trim
+The master trim sets the 0dB reference level for the volume control of each DAC. The master trim is programmable via
+registers 17-20 and is a 32bit signed number. Therefore it should never exceed’32'h7FFFFFFF (as this is full-scale signed).
+
+All Mono Mode
+An all mono mode is supported where all DACs are driven from the same source. This can be useful for high-end audio
+applications. The source data for all DACs can be programmatically configured to be either CH1 or CH2.
+
+De-emphasis
+The de-emphasis feature is included for audio data that has utilized the 50/15s pre-emphasis for noise reduction. There are
+three de-emphasis filters, one for 32kHz, one for 44.1kHz, and one for 48kHz.
+
+SPDIF Data Select
+An SPDIF source multiplexer allows for up to five SPDIF sources to be connected to the data pins. An internal
+programmable register (spdif_sel) is used to select the appropriate data pin to decode.
+
+
+
+
+     ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com            6
+  April 22, 2021                                                                                                                   3.7
+
+
+ ES9018K2M Datasheet
+
+System Clock (XI / MCLK)
+A system clock is required for proper operation of the digital filters and modulation circuitry. See p.30, Note 2 for the
+maximum MCLK frequencies supported. The minimum system clock frequency must also satisfy:
+
+Data Type                     Minimum MCLK Frequency                                                               Note
+DSD Data                      MCLK > 3 x FSR , FSR = 2.8224MHz (x 1, 2 or 4)                            The maximum FSR
+                              MCLK > 192 x FSR, FSR  384kHz                                            frequency is further
+Serial Normal Mode             or                                                                       limited by the maximum
+                              MCLK = 128 x FSR (synchronous MCLK) with FSR  384kHz                     MCLK frequencies
+Serial OSF Bypass Mode        MCLK > 24 x FSR, FSR  1.536MHz                                           supported as shown p.30,
+SPDIF Data                    MCLK > 386 x FSR, FSR  200kHz                                            Note 2.
+
+
+Data Clock
+DATA_CLOCK must be (2 x i2s_length) x FSR for SERIAL, and FSR for DSD modes. For SPDIF mode, this pin is used for
+SPDIF input. This pin should be pulled low if not used.
+
+Built-in Digital Filters
+Three digital filters (fast roll-off, slow roll-off filters and minimum phase filter) are included for PCM data. See 'PCM Filter
+Characteristics' for more information.
+
+Standby Mode
+For lowest power consumption the followings should be performed to enter stand-by mode:
+• Set the soft_start bit in register 14 to 1'b0 to ramp the DAC outputs (DACL, DACLB, DACR, DACRB) to ground.
+• RESETB pin should be brought to low digital level to:
+        o Shut off the DACs, Oscillator and internal regulator.
+        o Force digital I/O pins (DATA_CLK, DATA1, GPIO1, GPIO2, SDA ) into tri-state mode
+        o Reset all registers to default states
+• If XI/MCLK is supplied externally, it should be stopped at logic low level
+• If DVDD is supplied by an external regulator, it should be shut down during standby.
+
+To resume from standby mode, bring RESETB to high digital level and reinitialize all registers.
+
+DVDD Supply
+The ES9018K2M is equipped with a regulated DVDD supply powered from DVCC. The internal DVDD regulator must be
+decoupled to DGND with a capacitor that maintains a minimum value of 1F at 1.2V over the target operating temperature
+range. The recommended capacitor for decoupling DVDD is a 2.2F ±20%, X5R 6.3V 0402, e.g. TDK part number
+C1005X5R0J225M050BC or similar.
+• The internal DVDD should be used except under the following conditions:
+    PCM (SPDIF, I2S with OSF Bypass off or on): MCLK > 50MHz or FSR > 192kHz
+    DSD: MCLK > 50MHz or FSR > 11.2MHz
+• Internal DVDD may be used up to the maximum supported MCLK frequencies specified on p.29, Note 2. An External
+    DVDD (+1.3V) supply must be used above those frequencies. The external supply voltage must be greater than the
+    internal supply of +1.2V so the internal supply is disabled.
+
+
+
+
+     7        ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com
+   3.7                                                                                                             April 22, 2021
+
+
+                                                                                        ES9018K2M Datasheet
+
+Programmable FIR filter
+A two stage interpolating FIR design is used. The interpolating FIR filter is generated using MATLAB, and can then be
+downloaded using a custom C code.
+
+Example Source Code for Loading a Filter
+// only accept 128 or 16 coefficients
+// Note: The coefficients must be quantized to 24 bits for this method!
+// Note: Stage 1 consists of 128 values (0-127 being the coefficients)
+// Note: Stage 2 consists of 16 values (0-13 being the coefficients, 14-15 are zeros)
+// Note: Stage 2 is symmetric about coefficient 13. See the example filters for more information.
+byte reg26 = (byte)(coeffs.Count == 128 ? 0 : 128);
+for (int i = 0; i < coeffs.Count; i++)
+{
+    // stage 1 contains 128 coefficients, while stage 2 contains 16 coefficients
+    registers.WriteRegister(26, (byte)(reg26 + i));
+
+    // write the coefficient data
+    registers.WriteRegister(27, (byte)(coeffs[i] & 0xff));
+    registers.WriteRegister(28, (byte)((coeffs[i] >> 8) & 0xff));
+    registers.WriteRegister(29, (byte)((coeffs[i] >> 16) & 0xff));
+
+    registers.WriteRegister(30, 0x02);   // set the write enable bit
+}
+// disable the write enable bit when’we're done
+registers.WriteRegister(30, (byte)(setEvenBit ? 0x04 : 0x00));
+
+
+
+OSF Bypass
+The oversampling FIR filter can be bypassed, sourcing data directly into the IIR filter. ESS recommends using 8 x FSR as
+the input. For example, an external signal at 44.1kHz can be oversampled externally to 8 x 44.1kHz = 352.8kHz and then
+applied to the serial decoder in either I2S or LJ format. The maximum sample rate that can be applied is 1.536MHz (8 x
+192kHz).
+
+
+THD Compensation
+THD Compensation removes the non-linearity of the DAC resistors and to a lesser degree the non-linearity of passive
+components in the output stage. Taking the I-V characteristic curve of a real resistor you will notice that it as a slight
+downward curvature. As more current flows, more power dissipates the resistor heats and the resistance rises.
+
+Non-linearity of the DAC output resistors can lead to output distortion in two ways:
+
+     •   Amplitude modulation of the output current from the DAC
+
+     •   Gain modulation of the output stage as the output impedance of the DAC swings with the audio signal
+
+The ES9018K2M includes models for its output resistors and can compensate for their characteristic curve by finely adjusting
+the DAC codes for large and small signal amplitudes.
+
+THD Compensation is effective if the base THD+N measurement with no compensation is less than approximately 70dBr. If
+your system performs worse than this, check for other errors with the circuit before applying the THD Compensation.
+
+Registers #13, and #22 to #25 are used for THD Compensation.
+
+
+
+
+     ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com               8
+  April 22, 2021                                                                                                                                                                                                                           3.7
+
+
+ ES9018K2M Datasheet
+
+Audio Interface Formats
+                    LRCLK                                                                                                                                                                                                             RIGHT
+                                                                                                                             LEFT
+Several interface formats are provided so that direct connection to common audio processors is possible. The available
+formats are shown in the following diagrams.
+                                     BCLK     The audio interface format can be set by programming the registers.
+                                            SIN
+                                                               31   30    29                                                                                         2   1    0    31    30    29
+                                            32-bit            MSB                                                                                                            LSB MSB
+LRCLK                                                                                                                                                    RIGHT
+                                            SIN      LEFT
+                                            24-bit             23   22    21                                                                   2    1     0                        23    22    21                                                            2    1
+
+BCLK                                                          MSB                                                                                        LSB                       MSB
+                                            SIN
+SIN                                         20bit              19   18    17                                            2     1     0                                              19    18    17                                     2     1     0
+                   31    30    29                                              2        1     0       31    30    29                                                                                     2     1     0    31    30
+32-bit                                                        MSB                                                                  LSB                                             MSB                                                           LSB
+                   MSB                                                                       LSB MSB                                                                                                                LSB MSB
+                                            SIN
+                                            16bit              15   14    13                      2    1     0                                                                     15    14    13              2     1     0
+SIN                                                           MSB                                           LSB                                                                    MSB                                    LSB
+                   23    22    21                                              2        1     0       23    22    21                                                                                     2     1     0    23    22
+24-bit             MSB                                                                       LSB MSB                                                                                                                LSB MSB
+                                                                                                                                                          LEFT JUSTIFIED FORMAT
+
+SIN                                         LRCLK                                                                                                                                                                                     RIGHT
+                   15    14    13                                              2        1     0       15    14    13         LEFT                                                                        2     1     0    15    14
+16-bit             MSB                                                                       LSB MSB                                                                                                                LSB MSB
+
+                                            BCLK
+                                            SIN
+                                                               31   30 29 JUSTIFIED FORMAT
+                                                                    LEFT                                                                                             2   1    0    31    30    29
+                                            32-bit            MSB                                                                                                            LSB MSB
+                                            SIN
+                                            24-bit                                      23    22       21                                                            2   1    0                          23    22    21
+LRCLK                                                                                   MSB
+                                                                                                                                                         RIGHT               LSB                         MSB
+                                                     LEFT
+                                            SIN
+                                            20bit                                                                 19    18    17                                     2   1    0                                                 19    18    17
+BCLK
+                                                                                                                  MSB                                                        LSB                                                MSB
+
+SIN                                         SIN
+                         31    30   29      16bit                                       2     1        0    31    30    29               15    14   13               2   1    0                                2     1     0    31    30               15    14   1
+32-bit                   MSB                                                                          LSB MSB                                                                                                             LSB MSB
+                                                                                                                                         MSB                                 LSB                                                                       MSB
+
+
+SIN                                                                                                                                                      RIGHT JUSTIFIED FORMAT
+                         23    22   21                                                  2     1        0    23    22    21                                                                                     2     1     0    23    22
+24-bit                   MSB                                                                          LSB MSB                                                                                                             LSB MSB
+                                            LRCLK                                                                                                                                                                                     RIGHT
+                                                                                                                             LEFT
+SIN
+                         15    14   13                                                  2     1        0    15    14    13                                                                                     2     1     0    15    14
+16-bit                                      BCLK
+                         MSB                                                                          LSB MSB                                                                                                             LSB MSB
+                                            SIN
+                                                                    31    30       29                                                                                    2    1     0    31    30   29
+                                            32-bit                  MSB                                                                                                            LSB MSB
+                                            SIN                                     I2S FORMAT
+                                            24-bit                  23    22       21                                                               2     1     0                        23    22   21                                                            2
+                                                                    MSB                                                                                        LSB                       MSB
+Notes: for Left-Justified and I2S formats,
+                                      SIN the following number of BCLKs is present per (left plus right) frame:
+• 16-bit mode: 32 BCLKs               20bit              19 18 17           2 1  0                      19 18 17                                                                                                                            2     1     0
+
+• 24-bit mode: 48 BCLKs
+                                                        MSB                     LSB                    MSB                                                                                                                                             LSB
+                                      SIN
+• 32-bit mode: 64 BCLKs               16bit              15 14 13  2 1 0                                15 14 13                                                                                                     2     1     0
+                                                                    MSB                                           LSB                                                                    MSB                                    LSB
+
+                                                                                                                                                                         I2S FORMAT
+
+                                            DCLK
+                                         DCLK
+                                            D1
+                                         DSD1,               D..           D0                     D1               D2               D3               D4              FIGURE 4A
+                                            D2DSD2
+                                                                                            DSD NORMAL MODE
+
+                                         DCLK
+                                            DCLK
+                                            D1DSD2
+                                         DSD1,              D.. D.. D0 D0 D1 D1 D2 D2 D3 D3 D4 D4                                                                    FIGURE 4B
+                                            D2
+                                                                                             DSD PHASE MODE
+
+
+
+
+         9   ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com
+  3.7                                                                                                           April 22, 2021
+
+
+                                                                                         ES9018K2M Datasheet
+
+SERIAL CONTROL INTERFACE
+The registers inside the chip are programmed via an I 2C interface. The diagram below shows the timing for this interface.
+The chip address can be set to 2 different settings via the “ADDR” pin. The table below summarizes this.
+
+           ADDR       CHIP ADDRESS
+             0             0x90
+             1             0x92
+
+
+
+
+Notes:
+   1. The “ADDR” pin is used to create the CHIP ADDRESS. (0x90, 0x92)
+   2. The first byte after the chip address is the “ADDRESS” this is the register address.
+   3. The second byte after the CHIP ADDRESS is the “DATA” this is the data to be programmed into the register at the
+       previous “ADDRESS”.
+
+
+
+
+                    Start                                           Start                       Stop    Start
+
+
+                             Parameter                   Symbol      Standard-Mode       Fast-Mode      Unit
+                                                                        MIN       MAX    MIN   MAX
+                SCL Clock Frequency                        fSCL             0     100     0    400      kHz
+                START condition hold time                 tHD,STA           4.0    -     0.6    -       s
+                LOW period of SCL                          tLOW             4.7    -     1.3    -       s
+                HIGH period of SCL                         tHIGH            4.0    -     0.6    -       s
+                START condition setup time (repeat)       tSU,STA           4.7    -     0.6    -       s
+                SDA hold time from SCL falling            tHD,DAT           0.3    -     0.3    -       s
+                SDA setup time from SCL rising            tSU,DAT       250        -     100    -        ns
+                Rise time of SDA and SCL                    tr               -    1000         300       ns
+                Fall time of SDA and SCL                    tf               -    300          300       ns
+                STOP condition setup time                 tSU,STO           4      -     0.6    -       s
+                Bus free time between transmissions        tBUF             4.7    -     1.3    -       s
+                Capacitive load for each bus line           Cb               -    400     -    400      pF
+
+
+
+
+     ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com           10
+ April 22, 2021                                                                                                                                            3.7
+
+
+ES9018K2M Datasheet
+
+REGISTER MAP
+ Address
+                 Register       D7 (MSB)          D6               D5              D4               D3              D2               D1             D0 (LSB)
+(Dec/Hex)
+Read/Write
+ 0 / 0x00    SYSTEM SETTINGS                           OSC_DRV                                                RESERVED                          SOFT_RESET
+                    INPUT
+ 1 / 0x01                            I2S_LENGTH                         I2S_MODE                    AUTO_INPUT_SELECT                     INPUT_SELECT
+              CONFIGURATION
+ 2 / 0x02        RESERVED                                                               RESERVED
+ 3 / 0x03        RESERVED                                                               RESERVED
+ 4 / 0x04    AUTOMUTE _TIME                                                           AUTOMUTE_TIME
+                AUTOMUTE       AUTOMUTE_
+ 5 / 0x05                                                                                    AUTOMUTE_LEVEL
+                   _LEVEL      LOOPBACK
+               SOFT VOLUME
+                               SPDIF_AUTO     DEEMPH
+ 6 / 0x06      CONTROL 3 &                                           DEEMPH_SEL               RESERVED                          VOL_RATE
+                                _DEEMPH       _BYPASS
+               DE-EMPHASIS
+                  GENERAL
+ 7 / 0x07                      RESERVED              FILTER_SHAPE            RESERVED                     IIR_WR                             MUTE
+                 SETTINGS
+                     GPIO
+ 8 / 0x08                                            GPIO2_CFG                                                           GPIO1_CFG
+              CONFIGURATION
+ 9 / 0x09        RESERVED                                                     RESERVED FOR REVISION V
+               MASTER MODE     MASTER_CLK                                      SYNC_
+10 / 0x0A                                    CLOCK_DIVIDER_SELECT                                                        STOP_DIV
+                 CONTROL        _ENABLE                                        MODE
+                  CHANNEL                                                                CH2_ANALOG           CH1_ANALOG
+11 / 0x0B                      RESERVED                      SPDIF_SEL                                                           CH2_SEL            CH1_SEL
+                  MAPPING                                                                   _SWAP               _SWAP
+                DPLL/ASRC
+12 / 0x0C                                         DPLL_BW_I2S                                                        DPLL_BW_DSD
+                 SETTINGS
+                     THD
+13 / 0x0D                      RESERVED     BYPASS_THD                                                   RESERVED
+              COMPENSATION
+                SOFT START                  SOFT_START       MUTE_ON
+14 / 0x0E                      SOFT_START                                                                   SOFT_START_TIME
+                 SETTINGS                    _ON_LOCK         _LOCK
+15 / 0x0F        VOLUME 1                                                                VOLUME 1
+16 / 0x10        VOLUME 2                                                                VOLUME 2
+17 / 0x11
+18 / 0x12
+               MASTER TRIM                                                              MASTER_TRIM
+19 / 0x13
+20 / 0x14
+                GPIO INPUT
+ 21 / 0x15   SELECTION & OSF       GPIO_INPUT_SEL2                 GPIO_INPUT_SEL1            RESERVED         BYPASS_IIR       RESERVED        BYPASS_OSF
+                 BYPASS
+ 22 / 0x16    2ND HARMONIC
+              COMPENSATION                                                              THD_COMP_C2
+ 23 / 0x17
+               COEFFICIENTS
+ 24 / 0x18    3RD HARMONIC
+              COMPENSATION                                                              THD_COMP_C3
+ 25 / 0x19
+               COEFFICIENTS
+             PROGRAMMABLE      PROG_COEFF
+26 / 0x1A                                                                                   PROG_COEFF_ADDR
+             FILTER ADDRESS      _STAGE
+27 / 0x1B    PROGRAMMABLE
+28 / 0x1C         FILTER                                                                PROG_COEFF
+29 / 0x1D      COEFFICIENT
+             PROGRAMMABLE                                                                                     EVEN_STAGE2        PROG_            PROG_
+30 / 0x1E                                                    RESERVED
+             FILTER CONTROL                                                                                     _COEFF          COEFF_WE         COEFF_EN
+Read Only
+                                                                                                                                AUTOMUTE
+ 64 / 0x40     CHIP STATUS            RESERVED                   REVISION                       CHIP_ID                                      LOCK_STATUS
+                                                                                                                                 _STATUS
+ 65 / 0x41     GPIO STATUS                                              RESERVED                                                        GPIO_I[1:0]
+ 66 / 0x42
+ 67 / 0x43
+               DPLL RATIO                                                                DPLL_NUM
+ 68 / 0x44
+ 69 / 0x45
+  70-93 /
+             CHANNEL STATUS                                                        SPDIF CHANNEL STATUS
+0x46-0x5D
+
+
+
+
+     11        ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com
+   3.7                                                                                                            April 22, 2021
+
+
+                                                                                             ES9018K2M Datasheet
+
+REGISTER SETTINGS
+Register #0: System Settings
+8 bit, Read-Write Register, Default = 0x00
+ Bits           [7] [6] [5] [4] [3] [2] [1]                      [0]
+ Mnemonic           osc_drv          reserved *              soft_reset
+ Default         0      0       0       0   0    0       0         0
+
+ Bit       Mnemonic         Description
+                            Oscillator drive specifies the bias current to the oscillator pad.
+                            • 4'b0000: full bias (default)
+                            • 4'b1000: 3/4 bias
+                            • 4'b1100: 1/2 bias
+ [7:4]     osc_drv
+                            • 4'b1110: 1/4 bias
+                            • 4'b1111: shut down the oscillator
+                            • Other settings: reserved
+                            It is recommended to use the default setting.
+ [3:1]     reserved *
+                            1'b1 resets chip
+ [0]       soft_reset
+                            1'b0 is normal operation (default)
+
+* All Reserved Bits in Register #0 must be set to the indicated logic level to ensure correct device operation.
+
+
+Register #1: Input Configuration
+8 bit, Read-Write Register, Default = 0x8C
+ Bits            [7]   [6]   [5]    [4]    [3]  [2]                      [1]   [0]
+ Mnemonic       i2s_length i2s_mode auto_input_select                  input_select
+ Default          1         0       0       0        1         1          0     0
+
+ Bit       Mnemonic                     Description
+                                        2'd0 = 16bit
+ [7:6]     i2s_length                   2'd1 = 24bit
+                                        2'd2 or 2'd3 = 32bit (default)
+                                        2’d0 = I2S (default)
+                                        2’d1 = LJ mode
+ [5:4]     i2s_mode
+                                        2’d2 = I2S
+                                        2’d3 = LJ mode
+                                        2'd0 = input select
+                                        2'd1 = I2S or DSD
+ [3:2]     auto_input_select
+                                        2'd2 = I2S or SPDIF
+                                        2'd3 = I2S, SPDIF or DSD (default)
+                                        2'd0 = I2S (default)
+                                        2'd1 = SPDIF
+ [1:0]     input_select
+                                        2'd2 = reserved
+                                        2'd3 = DSD
+
+
+
+
+       ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com           12
+  April 22, 2021                                                                                                       3.7
+
+
+ ES9018K2M Datasheet
+
+Register #2: Reserved
+8 bit, Read-Write Register, Default = 0x18
+ Bits           [7] [6] [5] [4] [3] [2]         [1]     [0]
+ Mnemonic                     Reserved
+ Default         0   0    0    1     1   0      0       0
+
+
+Register #3: Reserved
+8 bit, Read-Write Register, Default = 0x10
+ Bits           [7] [6] [5] [4] [3] [2]         [1]     [0]
+ Mnemonic                     Reserved
+ Default         0   0    0    1     0   0      0       0
+
+
+
+Register #4: Soft Volume Control 1 (Automute Time)
+8 bit, Read-Write Register, Default = 0x00
+ Bits           [7] [6] [5] [4] [3] [2]         [1]     [0]
+ Mnemonic                   automute_time
+ Default         0   0    0     0    0    0     0       0
+
+ Bit        Mnemonic          Description
+                              Default o’ 8'd0 (Automute Disabled)
+ [7:0]      automute_time
+                              Time in Seconds = 2096896 / (automute_time x DATA_CLK) with DATA_CLK in Hz
+
+
+Register #5: Soft Volume Control 2 (Automute Level)
+8 bit, Read-Write Register, Default = 0x68
+ Bits                  [7]            [6] [5]    [4]     [3]    [2]   [1]   [0]
+ Mnemonic          automute_loopback             automute_level
+ Default                  0            1    1       0       1   0     0     0
+
+ Bit        Mnemonic               Description
+                                   1'b0 disables automute_loopback (default)
+ [7]        automute_loopback
+                                   1'b1 ramps to -infinity on automute
+ [6:0]      automute_level         The level (in 1dB increments) of the automute, default of 7'd104
+
+
+
+
+       13      ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com
+   3.7                                                                                                            April 22, 2021
+
+
+                                                                                               ES9018K2M Datasheet
+
+Register #6: Soft Volume Control 3 and De-emphasis
+8 bit, Read-Write Register, Default = 0x4A
+ Bits                    [7]                 [6]                 [5]  [4]             [3]       [2] [1] [0]
+ Mnemonic       spdif_auto_deemph       deemph_bypass           deemph_sel        reserved *       vol_rate
+ Default                  0                   1                   0    0               1         0    1     0
+
+ Bit      Mnemonic                  Description
+                                    1'b0 disables automatic de-emphasis select in SPDIF mode (default)
+ [7]      spdif_auto_deemph
+                                    1'b1 enables automatic de-emphasis select in SPDIF mode
+                                    1'b0 enables de-emphasis filters
+ [6]      deemph_bypass
+                                    1'b1 disabled de-emphasis filters (default)
+                                    2’b00 = 32kHz (default)
+                                    2’b01 = 44.1kHz
+ [5:4]    deemph_sel
+                                    2’b10 = 48kHz
+                                    2’b11 = RESERVED
+ [3]      reserved                  Must be left as 1'b1 for normal operation
+                                    3'd2 by default
+ [2:0]    vol_rate                  Sets the volume ramp rate to 0.0078125 x fs / 2(vol_rate-5) dB/s
+
+
+* All Reserved Bits in Register #6 must be set to the indicated logic level to ensure correct device operation.
+
+
+Register #7: General Settings
+8 bit, Read-Write Register, Default = 0x80
+ Bits               [7]       [6]     [5]            [4]      [3]   [2]   [1]   [0]
+ Mnemonic          reserved *   filter_shape     reserved *   iir_bw      mute
+ Default               1           0      0          0        0    0      0   0
+
+ Bit      Mnemonic         Description
+ [7]      reserved *
+                           2’d0 = fast rolloff (default)
+                           2’d1 = slow rolloff
+ [6:5]    filter_shape
+                           2’d2 = minimum phase
+                           2'd3 = reserved
+ [4]      reserved *
+                           2’d0 = 1.0757 x fs or 47.44kHz (fs = 44.1kHz) – Normal mode (default)
+                           2’d1 = 1.1338 x fs or 50kHz (fs = 44.1kHz)
+ [3:2]    iir_bw
+                           2’d2 = 1.3605 x fs or 60kHz (fs = 44.1kHz)
+                           2’d3 = 1.5873 x fs or 70kHz (fs = 44.1kHz)
+                           This is a soft mute, which uses the ramping volume control.
+                           mute[0]
+                           • 1’b0: Channel 1 (default of left channel) unmuted (default)
+ [1:0]    mute             • 1’b1: Channel 1 (default of left channel) muted
+                           mute[1]
+                           • 1’b0: Channel 2 (default of right channel) unmuted (default)
+                           • 1’b1: Channel 2 (default of right channel) muted
+
+* All Reserved Bits in Register #7 must be set to the indicated logic level to ensure correct device operation.
+
+
+
+
+       ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com           14
+  April 22, 2021                                                                                                       3.7
+
+
+ ES9018K2M Datasheet
+
+Register #8: GPIO Configuration
+8 bit, Read-Write Register, Default = 0x10
+ Bits           [7] [6] [5] [4] [3] [2] [1] [0]
+ Mnemonic           gpio2_cfg           gpio1_cfg
+ Default         0   0    0    1     0   0    0   0
+
+ Bit        Mnemonic      Description
+                          Set GPIO 2 configuration.
+ [7:4]      gpio2_cfg     Default to 4’d1 (DPLL Lock Status).
+                          See GPIO Configuration Table below for meaning of all settings.
+                          Set GPIO 1 configuration
+ [3:0]      gpio1_cfg     Default to 4’d0 (Automute Status).
+                          See GPIO Configuration Table below for meaning of all settings.
+
+
+GPIO Configuration Table
+
+ Setting      Direction   GPIO Function
+                          Automute status (active high)
+ 4’d0         Output
+                          – asserted when Automute condition is met
+                          DPLL Lock status (active high)
+ 4’d1         Output
+                          – asserted when DPLL is in lock
+                          Minimum Volume (active high)
+ 4’d2         Output      - asserted when volume of both the left & right channels has ramped to its minimum
+                          value (–127.5dB)
+ 4’d3         Output      MCLK
+                          DPLL Lock interrupt (active high)
+ 4’d4         Output      - asserted when DPLL Lock status changes state
+                          - reading register 64 clears the interrupt
+                          Automute Interrupt (active high)
+ 4’d5         Output      - asserted when Automute status changes state
+                          - reading register 64 clears the interrupt
+                          DPLL Lock or Automute interrupt (active high)
+ 4’d6         Output      - asserted when DPLL Lock or Automute status changes state
+                          - reading register 64 clears the interrupt
+ 4’d7         Output      Output low
+ 4’d8         Input       Used as input pin – pin status can be read from register 65.
+ 4’d9         Input       Input Selection – uses the GPIO as an input select based on register 21
+ 4’d15        Output      Output high
+
+
+
+Register #9: Reserved
+8 bit, Read-Write Register, Default = 0x22
+ Bits           [7] [6] [5] [4] [3] [2] [1]        [0]
+ Mnemonic             Reserved for Revision V
+ Default         0   0    0    0     0   0   0      0
+
+
+
+
+       15      ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com
+  3.7                                                                                                        April 22, 2021
+
+
+                                                                                     ES9018K2M Datasheet
+
+Register #10: Master Mode Control
+8 bit, Read-Write Register, Default = 0x5
+ Bits                    [7]              [6]     [5]             [4]       [3]   [2] [1] [0]
+ Mnemonic       master_clock_enable clock_divider_select      sync_mode           stop_div
+ Default                  0                0       0               0         0     1   0   1
+
+ Bit      Mnemonic                 Description
+                                   1’b0 disables master mode (default)
+ [7]      master_clock_enable
+                                   1’b1 enables master mode (driving Bit clock and Frame Clock)
+                                   2’b00: Bit Clock frequency = MCLK / 4 (default)
+                                   2’b01: Bit Clock frequency = MCLK / 8
+                                   2b10: Bit Clock frequency = MCLK / 16
+ [6:5]    clock_divider_select
+                                   2’b11: Bit Clock frequency = MCLK / 16
+
+                                   Frame Clock frequency = Bit Clock frequency / 64
+                                   1’b0 for normal operation of the DPLL and ASRC.
+                                   1’b1 to enable quick lock if the fs and MCLK are synchronous and MCLK is 128 x FSR
+ [4]      sync_mode
+                                   Note: quick lock can only be used in PCM normal mode.
+                                   Sets the number of FSR edges that must occur before the DPLL and
+                                   ASRC can lock on to the incoming signal.
+                                   4’d0 = 16384 FSR edges
+                                   4’d1 = 8192 FSR edges
+                                   4’d2 = 5461 FSR edges
+                                   4’d3 = 4096 FSR edges
+                                   4’d4 = 3276 FSR edges
+                                   4’d5 = 2730 FSR edges (default)
+                                   4’d6 = 2340 FSR edges
+ [3:0]    stop_div
+                                   4’d7 = 2048 FSR edges
+                                   4’d8 = 1820 FSR edges
+                                   4’d9 = 1638 FSR edges
+                                   4’d10 = 1489 FSR edges
+                                   4’d11 = 1365 FSR edges
+                                   4’d12 = 1260 FSR edges
+                                   4’d13 = 1170 FSR edges
+                                   4’d14 = 1092 FSR edges
+                                   4’d15 = 1024 FSR edges
+
+For correct operation, master mode should only be enabled when the DAC’s input mode is set to I 2S, and when i2s_length is
+set to 32-bit and i2s_mode is set to I2S in register 1.
+
+When master mode is enabled, the DATA_CLK pin will output Bit Clock and the DATA1 pin will output Frame Clock at
+frequencies specified by clock divider select.
+
+For compatibility with Rev. W, or when PCM data with FSR > 96kHz is used, stop_div should be set to 4’d0 (16384 FSR
+edges).
+
+
+
+
+       ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com      16
+  April 22, 2021                                                                                                        3.7
+
+
+ ES9018K2M Datasheet
+
+Register #11: Channel Mapping
+8 bit, Read-Write Register, Default = 0x02
+ Bits               [7]      [6] [5] [4]             [3]                   [2]               [1]         [0]
+ Mnemonic       reserved *     spdif_sel       ch2_analog_swap       ch1_analog_swap       ch2_sel     ch1_sel
+ Default             0        0     0   0             0                     0                 1           0
+
+ Bit        Mnemonic             Description
+ [7]        reserved *
+                                 select the spdif data source
+                                 3’d0 = DATA_CLK (default)
+                                 3’d1 = DATA2
+ [6:4]      spdif_sel            3’d2 = DATA1
+                                 3’d3 = GPIO1
+                                 3’d4 = GPIO2
+                                 3’d5-7: reserved
+                                 1’b0 = normal operation (default)
+ [3]        ch2_analog_swap
+                                 1’b1 = swap dac and dacb
+                                 1’b0 = normal operation (default)
+ [2]        ch1_analog_swap
+                                 1’b1 = swap dac and dacb
+                                 1’b0 = left
+ [1]        ch2_sel
+                                 1’b1 = right (default)
+                                 1’b0 = left (default)
+ [0]        ch1_sel
+                                 1’b1 = right
+
+* All Reserved Bits in Register #11 must be set to the indicated logic level to ensure correct device operation.
+
+Left and Right channels can be reversed using Register #11.
+
+
+
+
+       17       ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com
+  3.7                                                                                                        April 22, 2021
+
+
+                                                                                    ES9018K2M Datasheet
+
+Register #12: DPLL/ASRC Settings
+8 bit, Read-Write Register, Default = 0x5A
+ Bits           [7] [6] [5] [4] [3] [2] [1] [0]
+ Mnemonic          dpll_bw_i2s         dpll_bw_dsd
+ Default         0    1   0    1     1    0   1    0
+
+ Bit      Mnemonic        Description
+                          DPLL bandwidth setting for I2S and SPDIF modes (16 settings)
+                                 4’b0000 : OFF
+                                 4’b0001 : Lowest Bandwidth
+
+ [7:4]    dpll_bw_i2s             4’b0101 : (default)
+
+                                  4’b1010 :
+
+                                4’b1111 : Highest Bandwidth
+                          DPLL bandwidth setting for DSD mode (16 settings)
+                                4’b0000 : OFF
+                                4’b0001 : Lowest Bandwidth
+
+ [3:0]    dpll_bw_dsd             4’b0101 :
+
+                                  4’b1010 : (default)
+
+                                  4’b1111 : Highest Bandwidth
+
+Register #13: THD Compensation
+8 bit, Read-Write Register, Default = 0x40
+ Bits               [7]            [6]        [5]   [4] [3] [2] [1]   [0]
+ Mnemonic       reserved *    bypass_thd              reserved *
+ Default             0              1         0     0    0   0   0    0
+
+ Bit      Mnemonic       Description
+ [7]      reserved *
+                         1’b0: enable THD compensation
+                             • output = input + (input2) x thd_comp_c2 + (input3) x thd_comp_c3
+                             • thd_comp_c2 is stored in registers 23-22 (16 bits signed) (register 23 stores MSBs)
+ [6]      bypass_thd
+                         thd_comp_c3 is stored in registers 25-24 (16 bits signed) (register 25 stores MSBs)
+                         1’b1: disable THD compensation (default)
+                             • PCM mode: output = input; DSD mode: output = input / 2
+ [5:0]    reserved *
+
+* All Reserved Bits in Register #13 must be set to the indicated logic level to ensure correct device operation.
+THD compensation can be used to reduce the 2nd and 3rd harmonic distortion introduced by external output drivers.
+A system level tuning is required to arrive at the optimum coefficients for thd_comp_c2 and thd_comp_c3.
+
+Notes:
+• To get the same gain (output = input) for PCM and DSD modes without THD compensation, bypass_thd should be set to
+   1’b0 with thd_comp_c2 and thd_comp_c3 set to 16’d0 (default)
+• Erroneous compensation can lead to higher distortion than the one without compensation. If accurate tuning cannot be
+   performed, thd_comp_c2 and thd_comp_c3 should be set to 16’d0 (default) if bypass_thd is set to 1’b0.
+
+
+
+       ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com      18
+  April 22, 2021                                                                                                             3.7
+
+
+ ES9018K2M Datasheet
+
+Register #14: Soft Start Settings
+8 bit, Read-Write Register, Default = 0x8A
+ Bits               [7]               [6]                        [5]       [4][3] [2] [1] [0]
+ Mnemonic       soft_start   soft_start_on_lock             mute_on_lock     soft_start_time
+ Default             1                 0                          0        0   1    0     1  0
+
+ Bit        Mnemonic                Description
+                                    1’b0: Ramp the output stream to ground
+ [7]        soft_start
+                                    1’b1: Normal operation (default) – ramp the output stream to ½ x AVCC_L/R
+                                    1’b0: Do not force output low when lock is lost (default)
+ [6]        soft_start_on_lock
+                                    1’b1: Force output low when lock is lost
+                                    1’b0: Do not force a mute when lock is lost (default)
+ [5]        mute_on_lock
+                                    1’b1: Force a mute when lock is lost
+                                    Time for soft start ramp
+                                    = 4096 x 2(soft_start_time+1) / MCLK seconds (where MCLK is measured in Hz).
+ [4:0]      soft_start_time
+                                    The valid range of soft-start_time is from 0 to 20.
+
+Register #15: Volume 1 (usually selected for the Left Channel, but can be reversed using Register #11)
+8 bit, Read-Write Register, Default = 0x00
+ Bits           [7] [6] [5] [4] [3] [2]           [1]    [0]
+ Mnemonic                     volume1
+ Default         0   0    0    0     0   0         0      0
+
+ Bit        Mnemonic          Description
+                              Default to 8’d0
+ [7:0]      volume1
+                              0dB to –127.5dB in 0.5dB steps
+
+Register #16: Volume 2 (usually selected for the Right Channel, but can be reversed using Register #11)
+8 bit, Read-Write Register, Default = 0x00
+ Bits        [7] [6] [5] [4] [3] [2] [1]                [0]
+ Mnemonic                    volume2
+ Default      0    0     0    0    0    0  0            0
+
+ Bit        Mnemonic          Description
+                              Default to 8’d0
+ [7:0]      volume2
+                              0dB to –127.5dB in 0.5dB steps
+
+Register #20-17: Master Trim
+32 bit, Read-Write Register, Default = 32’h7ffffff. Reg 20 are the MSB’s, Reg 17 are the LSBs.
+ Bits              [31:0]
+ Mnemonic      master_trim
+ Default         32’h7fffffff
+
+This is a 32 bit value that sets the 0dB level for all volume controls. This is a signed number, so it should never exceed
+32’h7fffffff (which is 231 – 1).
+
+
+
+
+       19       ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com
+   3.7                                                                                                               April 22, 2021
+
+
+                                                                                          ES9018K2M Datasheet
+
+Register #21: GPIO Input Selection and OSF Bypass
+8 bit, Read-Write Register, Default = 0x00
+ Bits                 [7:6]                [5:4]                 [3]          [2]             [1]            [0]
+ Mnemonic        gpio_input_sel2      gpio_input_sel1        reserved *    bypass_iir     reserved *     bypass_osf
+ Default           0         0          0         0               0            0               0              0
+
+ Bit      Mnemonic            Description
+                              Selects which input will be selected when GPIOX = 1’b1
+                              2’d0 = I2S data (default)
+ [7:6]    gpio_input_sel2     2’d1 = SPDIF data
+                              2’d2 = reserved
+                              2’d3 = DSD data
+                              Selects which input will be selected when GPIOX = 1’b0
+                              2’d0 = I2S data (default)
+ [5:4]    gpio_input_sel1     2’d1 = SPDIF data
+                              2’d2 = reserved
+                              2’d3 = DSD data
+ [3]      reserved *
+                              1’b0 = Use the IIR filter (default)
+ [2]      bypass_iir
+                              1’b1 = Bypass the IIR filter.
+ [1]      reserved *
+                              1’b0 = Use the interpolating 8x FIR filter (default)
+                              1’b1 = Bypass the interpolating 8x FIR filter.
+ [0]      bypass_osf
+                              Note: Bypassing the interpolating filter requires that the input data be
+                              oversampled at 8x fs by an external oversampling filter.
+
+* All Reserved Bits in Register #21 must be set to the indicated logic level to ensure correct device operation.
+
+Notes: Any of the GPIO can be configured to be used as an input select. This allows an external MCU or controller to set
+the input type by setting the GPIO to either logic high (1’b1) or logic low (1’b0). To set this feature, the first step is to enable
+one of the GPIO as an input select by setting gpio_cfg to 4’d9. Once a GPIO is configured as an input select it has the ability
+to select between two different inputs. The first input (logic low) is set via register 21[5:4]. The second input (logic high) is
+set via register 21[7:6]. Only one GPIO should be configured as an input select, and the ES9018K2M will only use the first
+GPIO if multiple GPIOs are configured as an input selection.
+
+
+
+
+       ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com              20
+  April 22, 2021                                                                                                         3.7
+
+
+ ES9018K2M Datasheet
+
+Register #23-22: 2nd Harmonic Compensation Coefficients
+16 bit, Read-Write Register, Default = 0x0000 (no compensation). Register #23 is MSB. See Register #13 for more details.
+ Bits               [15:0]
+ Mnemonic      Thd_comp_c2
+ Default            16’d0
+
+Register #25-24: 3rd Harmonic Compensation Coefficients
+16 bit, Read-Write Register, Default = 0x0000 (no compensation). Register #25 is MSB. See Register #13 for more details.
+ Bits               [15:0]
+ Mnemonic      Thd_comp_c3
+ Default            16’d0
+
+
+The THD Compensation registers are signed integer values split into two memory locations each.
+
+          THD Compensation Coefficient                     MSB                                    LSB
+               x^3 (third harmonic)                     Register 25                           Register 24
+              x^2 (second harmonic)                     Register 23                           Register 22
+
+                                          Table 1: THD Compensation Registers
+
+1. Configure the output stage gain for the maximum desired output level. If any component values are later changed on
+   the output audio signal path you will need to re-tune the THD Compensation to achieve peak performance.
+
+2. Set the input level, ES9018K2M Volume and Master Trim for the maximum desired output level.
+   If the output level is later increased beyond this level you will need to re-tune the THD Compensation to achieve
+   peak performance.
+
+3. Adjust registers 0x23 and 0x25 to achieve peak THD performance. Use the I2C interface or the ES9018K2M GUI to make
+   the adjustments while watching the THD+N measurement.
+
+  In the GUI, adjust the THD Compensation sliders as shown in figure 1. The sliders are linked to the MSB of the THD
+  Compensation registers so they are somewhat coarse.
+
+  Both channels are tuned simultaneously; keep an eye on both measurements.
+
+  Typical register values are very close to zero.
+
+4. For finer adjustments use registers 0x22 and 0x24. Use the I2C interface or the ES9018K2M GUI to make large changes
+   of 50 or so while watching the THD+N measurement. Switch to smaller increments when you're close to peak
+   performance.
+
+  In the GUI, open the register listing (see figure 2) and click Update Registers to make sure the most up-to-date values are
+  displayed. There are no sliders for the fine-adjust registers (see figure 3).
+
+The ES9018K2M GUI is available for download from the ESS website at:
+64-Bit: http://www.esstech.com/software/Sabre2M_signed_x64.zip
+32-Bit: http://www.esstech.com/software/Sabre2M_signed_x86.zip
+
+
+
+
+     21       ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com
+3.7                                                                                                     April 22, 2021
+
+
+                                                                               ES9018K2M Datasheet
+
+
+
+
+                  Figure 1. THD Compensation
+
+
+
+
+                  Figure 2. Opening the register listing
+
+
+
+
+                              Figure 3. THD Compensation Registers in
+                              the register listing
+
+
+
+
+  ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com      22
+  April 22, 2021                                                                                                              3.7
+
+
+ ES9018K2M Datasheet
+
+Register #26: Programmable Filter Address
+8 bit, Read-Write Register, Default = 0x00
+ Bits                  [7]                    [6:0]
+ Mnemonic       prog_coeff_stage         prog_coeff_addr
+ Default                0            0 0 0 0 0 0                0
+
+ Bit        Mnemonic             Description
+                                 Selects which stage of the filter to write.
+ [7]        prog_coeff_stage     1’b0 = Stage 1 of the oversampling filter (128 coefficients).
+                                 1’b1 = Stage 2 of the oversampling filter (16 coefficients)
+                                 Selects the coefficient address when writing custom coefficients
+ [6:0]      prog_coeff_addr
+                                 for the oversampling filter.
+
+Register #29-27: Programmable Filter Coefficient
+8 bit, Read-Write Register, Default = 0x000000
+ Bits              [23:0]
+ Mnemonic          prog_coeff
+ Default             24’d0
+
+ Bit         Mnemonic       Description
+ [23:0]      prog_coeff     A 24-bit filter coefficient that will be written to address ‘prog_coeff_addr’.
+
+Register #30: Programmable Filter Control
+8 bit, Read-Write Register, Default = 0x00
+ Bits                [7:3]                 [2]                     [1]                 [0]
+ Mnemonic         reserved *       even_stage2_coeff          prog_coeff_we       prog_coeff_en
+ Default        0 0 0 0 0                   0                       0                   0
+
+ Bit        Mnemonic               Description
+ [7:3]      reserved *
+                                   Sets the type of symmetry of the stage 2 programmable filter.
+ [2]        even_stage2_coeff      1’b0 = Uses a sine symmetric filter (27 coefficients).
+                                   1’b1 = Uses a cosine symmetric filter (28 coefficients).
+                                   1’b0 = Disable writing to the custom filter coefficients.
+                                   1’b1 = Enable writing to the custom filter coefficients.
+ [1]        prog_coeff_we
+                                   Note: When set to 1’b1 the custom filter will be bypassed
+                                   regardless of the state of register 21[0].
+                                   1’b0 = Use one of the built-in oversampling filters.
+                                   1’b1 = Use the custom oversampling filter.
+ [0]        prog_coeff_en
+                                   Note: The custom filter is not programmed to anything on reset,
+                                   valid coefficients must be written to the filter before enabling.
+
+* All Reserved Bits in Register #30 must be set to the indicated logic level to ensure correct device operation.
+
+Notes: even_stage2_coeff sets the type of symmetry used by the second stage filter. The actual RAM is 16 coefficients, but
+only the first 14 coefficients are used when applying the oversampling filter. The first 14 coefficients are mirrored using either
+sine or cosine symmetry, resulting in a filter length of either 27 or 28 taps. This means that the second stage RAM should
+only contain half of the impulse response of the second stage filter, and the impulse peak value will be contained in the 14 th
+coefficient. Also note that, due to the symmetry of the filter, only linear phase filters may be used in the second stage.
+
+
+
+       23      ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com
+  3.7                                                                                                          April 22, 2021
+
+
+                                                                                             ES9018K2M Datasheet
+
+Register #64: Chip Status
+8 bit, Read-Only Register
+ Bits          [7] [6]     [5]             [4]     [3] [2]         [1]             [0]
+ Mnemonic      reserved revision                 chip_id     automute_status   lock_status
+
+ Bit      Mnemonic              Description
+ [7:6]    reserved
+                                1’b0 => revision W.
+ [5]      revision
+                                1’b1 => revision V.
+ [4:2]    chip_id               3’d4 => ES9018K2M
+                                1’b0 => Automute condition is inactive.
+ [1]      automute_status
+                                1’b1 => Automute condition is active.
+                                1’b0 => The Jitter Eliminator is not locked to an incoming signal.
+ [0]      lock_status
+                                1’b1 => The Jitter Eliminator is locked to an incoming signal.
+
+
+Register #65: GPIO Status
+8 bit, Read-Only Register
+ Bits           [7]   [6]    [5] [4] [3]     [2]      [1]   [0]
+ Mnemonic                   reserved                 gpio_I[1:0]
+
+ Bit     Mnemonic            Description
+ [7:2]   reserved
+ [1]     gpio_I[1]           Status of pin GPIO2
+ [0]     gpio_I[0]           Status of pin GPIO1
+
+
+Register #69-66: DPLL Ratio
+32 bit, Read-Only Register. Register 69 contains the MSBs, Register 66 contains the LSBs.
+ Bits            [31:0]
+ Mnemonic      dpll_num
+
+This is a read-only 32-bit value that can be used to calculate the sample rate. The raw sample rate (FSR) can be calculated
+using: FSR = (DPLL_NUM x FMCLK) / 232.
+
+Note that the DPLL number (register 66-69) should be read from LSB to MSB as it is latched on the LSBs (register 66).
+
+
+
+Register #93-70: Channel Status
+Register 93 contains the MSBs, Register 70 contains the LSBs. Format is [191:0]
+
+These registers allow read back of the SPDIF channel status. The status definition is different for the consumer configuration
+and professional configuration. Please refer to the following two tables for details.
+
+
+
+
+       ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com        24
+April 22, 2021                                                                                                                                       3.7
+
+
+ES9018K2M Datasheet
+
+                               SPDIF CHANNEL STATUS – Consumer configuration
+        Address      [7]          [6]             [5]                [4]               [3]                 [2]             [1]           [0]
+         Offset
+           0      Reserved    Reserved     0: 2-Channel        Reserved         0: No-Preemph       0: Copyright        0: Audio   0: Consumer
+                                           1: 4-Channel                         1: Pre-emphasis     1: Non-Copyright    1: Data    1: Professional
+
+          1       Category Code
+                  0x00: General
+                  0x01: Laser-Optical
+                  0x02: D/D Converter
+                  0x03: Magnetic
+                  0x04: Digital Broadcast
+                  0x05: Musical Instrument
+                  0x06: Present A/D Converter
+                  0x08: Solid State Memory
+                  0x16: Future A/D Converter
+                  0x19: DVD
+                  0x40: Experimental
+          2       Channel Number                                                Source Number
+                  0x0: Don’t Care                                               0x0:Don’t Care
+                  0x1: A (Left)                                                 0x1: 1
+                  0x2: B (Right)                                                0x2: 2
+                  0x3: C                                                        0x3: 3
+                  0x4: D                                                        0x4: 4
+                  0x5: E                                                        0x5: 5
+                  0x6: F                                                        0x6: 6
+                  0x7: G                                                        0x7: G
+                  0x8: H                                                        0x8: 8
+                  0x9: I                                                        0x9: 9
+                  0xA: J                                                        0xA: 10
+                  0xB: K                                                        0xB: 11
+                  0xC: L                                                        0xC: 12
+                  0xD: M                                                        0xD: 13
+                  0xE: N                                                        0xE: 14
+                  0xF: O                                                        0xF: 15
+          3       Reserved Reserved Clock Accuracy                              Sample Frequency
+                                           0x0:Level 2 1000ppm                 0x0: 44.1k
+                                           0x1:Level 1 50ppm                   0x2: 48k
+                                           0x2:Level 3 variable pitch shifted   0x3: 32k
+                                                                                0x4: 22.05k
+                                                                                0x6: 24k
+                                                                                0x8: 88.2k
+                                                                                0xA: 96k
+                                                                                0xC: 176.4k
+                                                                                0xE: 192k
+          4       Reserved    Reserved     Reserved            Reserved         Word Length:                                       Word Field Size
+                                                                                If Word Field Size=0 |If Word Field Size = 1       0:Max 20bits
+                                                                                000=Not indicated |000=Not indicated               1:Max 24bits
+                                                                                100 = 23bits        |100 = 19bits
+                                                                                010 = 22bits        |010 = 18bits
+                                                                                110 = 21bits        |110 = 17bits
+                                                                                001 = 20bits        |001 = 16bits
+                                                                                101 = 24bits        |101 = 20bits
+         5-23     Reserved
+
+
+
+
+   25         ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com
+3.7                                                                                                                                              April 22, 2021
+
+
+                                                                                                              ES9018K2M Datasheet
+
+                             SPDIF CHANNEL STATUS – Professional configuration
+      Address              [7]               [6]             [5]             [4]        [3]           [2]               [1]                [0]
+       Offset
+         0      sampling frequency:                   lock:                emphasis:                              0: Audio          0: Consumer
+                00: not indicated (or see byte 4)     0: locked            000: Emphasis not indicated            1: Non-audio      1: Professional
+                10: 48 kHz                            1: unlocked          001: No emphasis
+                01: 44.1 kHz                                               011: CD-type emphasis
+                11: 32 kHz                                                 111: J-17 emphasis
+
+        1       User bit management:                                                 Channel mode:
+                0000: no indication                                                  0000: not indicated (default to 2 channel)
+                1000: 192-bit block as channel status                                1000: 2 channel
+                0100: As defined in AES18                                            0100: 1 channel (monophonic)
+                1100: user-defined                                                   1100: primary / secondary
+                0010: As in IEC60958-3 (consumer)                                    0010: stereo
+                                                                                     1010: reserved for user applications
+                                                                                     0110: reserved for user applications
+                                                                                     1110: SCDSR (see byte 3 for ID)
+                                                                                     0001: SCDSR (stereo left)
+                                                                                     1001: SCDSR (stereo right)
+                                                                                     1111: Multichannel (see byte 3 for ID)
+        2       alignment level:                      Source Word Length:                       Use of aux sample word:
+                00: not indicated                     If max = 20bits     |If max = 24bits      000: not defined, audio max 20 bits
+                10: –20dB FS                          000=Not indicated |000=Not indicated 100: used for main audio, max 24 bits
+                01: –18.06dB FS                       100 = 23bits      |100 = 19bits           010: used for coord, audio max 20 bits
+                                                      010 = 22bits      |010 = 18bits           110: reserved
+                                                      110 = 21bits      |110 = 17bits
+                                                      001 = 20bits      |001 = 16bits
+                                                      101 = 24bits      |101 = 20bits
+        3       Channel identification:
+                if bit 7 = 0 then channel number is 1 plus the numeric value of bits 0-6 (bit reversed).
+                if bit 7 = 1 then bits 4–6 define a multichannel mode and bits 0–3 (bit reversed) give the channel number within that mode.
+        4       fs scaling:                    Sample frequency (fs):                             Reserved       DARS (Digital audio reference signal):
+                0: no scaling                  0000: not indicated                                               00: not a DARS
+                1: apply factor of             0001: 24kHz                                                       01: DARS grade 2 (10ppm)
+                    1 / 1.001 to value         0010: 96kHz                                                       10: DARS grade 1 (1ppm)
+                                               1001: 22.05kHz                                                    11: Reserved
+                                               1010: 88.2kHz
+                                               1011: 176.4kHz
+                                               0011: 192kHz
+                                               1111: User defined
+        5       Reserved
+        6-9     alphanumerical channel origin: four-character label using 7-bit ASCII with no parity. Bits 55, 63, 71, 79 = 0.
+       10-13    alphanumerical channel destination: four-character label using 7-bit ASCII with no parity. Bits 87, 95, 103, 111 = 0.
+       14-17    local sample address code: 32-bit binary number representing the sample count of the first sample of the channel status block.
+       18-21    time of day code: 32-bit binary number representing time of source encoding in samples since midnight
+        22      reliability flags
+                0: data in byte range is reliable
+                1: data in byte range is unreliable
+        23      CRCC
+                00000000: not implemented
+                X: error check code for bits 0–183
+
+
+
+
+  ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com                                               26
+April 22, 2021                                                                                                              3.7
+
+
+ES9018K2M Datasheet
+
+APPLICATION DIAGRAM
+
+
+
+
+RECOMMENDED POWER-UP SEQUENCE                                                                   ~
+                                                                                                ~
+
+                                              VCCA
+
+                                 AVCC_L, AVCC_R
+                                                                                                ~
+                                                                                                ~
+
+
+
+
+                                           DVCC                  Same time as VCCA or later
+                                                                                                ~
+                                                                                                ~
+
+
+
+
+                        External DVDD (if required)              Same time as DVCC or later
+                                                                                                ~
+                                                                                                ~
+
+
+
+
+                 XI / MCLK (if externally supplied)
+
+
+
+                                         RESETB
+                                                      At power up, assert RESETB until at least        Subsequent reset
+                                                      1ms after all external power supplies (and       should be asserted
+                                                      XI/MCLK if supplied externally) are stabilized   for 10ns or longer
+
+
+
+
+   27      ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com
+   3.7                                                                                                                                    April 22, 2021
+
+
+                                                                                                           ES9018K2M Datasheet
+
+ABSOLUTE MAXIMUM RATINGS
+   PARAMETER                                                                        RATING
+   Positive Supply Voltage (DVCC, VCCA, AVCC_L, AVCC_R)                             +4.7V with respect to GND
+   Positive Supply Voltage (DVDD)                                                   +1.8V with respect to GND
+   DAC Output voltage Range (DACL, DACR, DACLB, DACRB)                              GND < Vout < AVCC
+   Storage temperature Range                                                        –65C to +150C
+   Operating Junction Temperature                                                   +125C
+   Voltage Range for Digital Input pins                                             –0.3V to DVCC+ 0.3V
+   ESD Protection
+           Human Body Model (HBM)                                                   2000V
+           Machine Model (MM)                                                       200V
+WARNING: Stresses beyond those listed under “Absolute Maximum Ratings” may cause permanent damage to the device. These are stress ratings only and
+ functional operation of the device at these or any other conditions beyond those indicated under “recommended operating conditions” is not implied. Exposure
+ to absolute–maximum–rated conditions for extended periods may affect device reliability.
+WARNING: Electrostatic Discharge (ESD) can damage this device. Proper procedures must be followed to avoid ESD when handling this device.
+
+RECOMMENDED OPERATING CONDITIONS
+  PARAMETER                                   SYMBOL           CONDITIONS
+  Operating temperature                         TA             –20C to +70C
+
+                                                                                                 Current nominal           Current standby
+  Power Supply                                                 Voltage
+                                                                                                 (Note 1)                  (Notes 1, 2)
+                                                               +1.8V  5%                        13.0mA                    0mA
+  Digital Power Supply Voltage                  DVCC
+                                                               +3.3V  5%                        14.2mA                    0mA
+  Internal Digital Core supply                  DVDD           +1.2V (typical) (Note 3)
+  External Digital Core Supply                  DVDD           +1.3V  5% (Note 4)               50mA
+  Analog Core Supply Voltage                    VCCA           +3.3V  5%                        0.8mA                     0mA
+                                               AVCC_L
+  Analog Power Supply Voltage                                  +3.3V  5%                        8.0mA                     0mA
+                                               AVCC_R
+                                                               DVCC = +1.8V                      52mW                      < 1mW
+  Total Power
+                                                               DVCC = +3.3V                      76mW                      < 1mW
+
+ Notes:
+   (1) fs = 44.1kHz, external MCLK = 22MHz, I2S input, DAC output connected to current-to-voltage converter, internal DVDD, all external
+      supply voltages at nominal center values
+   (2) With RESETB held low after setting the soft_start bit in register 14 to 1’b0 to fully ramp the DAC outputs to ground
+   (3) Internal DVDD should be used except under the conditions described on page 7.
+   (4) External DVDD current measured at 192kHz sample rate and MCLK = 80MHz.
+
+
+
+
+      ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com                                      28
+April 22, 2021                                                                                                     3.7
+
+
+ES9018K2M Datasheet
+
+
+
+
+DC ELECTRICAL CHARACTERISTICS
+Symbol     Parameter                       Minimum           Maximum         Unit    Comments
+  VIH      High-level input voltage      DVCC/2 + 0.4                         V
+  VIL      Low-level input voltage                              0.4           V
+  VOH      High-level output voltage      DVCC – 0.2                          V      IOH = 100A
+  VOL      Low-level output voltage                             0.2           V      IOL = 100A
+   CIN     Input capacitance                                     5
+                                                                              pF     fc = 1MHz
+   CO      Input/output capacitance                              5
+  CCLK     CLK capacitance                                       10           pF     fc = 1MHz
+
+
+
+
+   29      ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com
+    3.7                                                                                                      April 22, 2021
+
+
+                                                                                                 ES9018K2M Datasheet
+
+XI / MCLK Timing
+                              tMCH
+
+ MCLK
+                                                    tMCL
+                              tMCY
+
+    Parameter                              Symbol      Min              Max        Unit
+    MCLK pulse width high                   TMCH       4.5                          ns
+    MCLK pulse width low                    TMCL       4.5                          ns
+    MCLK cycle time                         TMCY       10                           ns
+    MCLK duty cycle                                    45:55            55:45
+
+
+
+Audio Interface Timing
+                                    tDCY
+
+
+ DATA_CLK
+ DATA_CLK
+                                     tDCH                  tDCL
+
+                              tDH                                 tDS
+
+  DATA[8:1]
+ DATA[2:1]            Valid           Invalid                     Valid
+
+L
+
+    Parameter                                              Symbol         Min     Max     Unit
+    DATA_CLK pulse width high                                tDCH          4.5            ns
+    DATA_CLK pulse width low                                 tDCL          4.5            ns
+    DATA_CLK cycle time                                      tDCY          10             ns
+    DATA_CLK duty cycle                                                   45:55   55:45
+    DATA set-up time to DATA_CLK rising edge                  tDS          4.1            ns
+    DATA hold time to DATA_CLK rising edge                    tDH           2             ns
+
+Notes:
+• Audio data on DATA[2:1] are sampled at the rising edges of DATA_CLK and must satisfy the setup and hold time
+   requirements relative to the rising edge of DATA_CLK
+• For DSD Phase mode, the normal data (D0, D1, D2... on p.10) must satisfy the setup and hold time requirements relative
+   to the rising edge of DATA_CLK. The complimentary data (D0, D1, etc.) will be ignored.
+
+
+
+
+      ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com       30
+  April 22, 2021                                                                                                                 3.7
+
+
+ ES9018K2M Datasheet
+
+ANALOG PERFORMANCE
+Test Conditions (unless otherwise stated)
+    1.    TA = 25oC, AVCC = VCCA = DVCC = 3.3V, internal DVDD with 2.2F ±20% decoupling, fs = 44.1kHz, MCLK = 27MHz & 32-bit data
+    2.    SNR / DNR: A-weighted over 20Hz-20kHz in averaging mode
+          THD+N: un-weighted over 20Hz-20kHz bandwidth
+
+PARAMETER                                            CONDITIONS               MIN              TYP              MAX       UNIT
+Resolution                                                                                      32                        Bits
+MCLK (PCM normal mode)                               Note *3               192FSR
+MCLK (PCM OSF bypass mode)                                                  24FSR
+                                                                                                               Note *2    Hz
+MCLK (DSD mode)                                                              3FSR
+MCLK (SPDIF mode)                                                          386FSR
+DYNAMIC PERFORMANCE
+  DNR (differential current mode)                    –60dBFS                                   127                        dB-A
+  THD+N (differential current mode)                  0dBFS                                     –120                       dB
+ANALOG OUTPUT
+                                                                                               3.05
+  Differential (+ or –) voltage output range         Full-scale out                                                       Vp-p
+                                                                                         (0.924 x AVCC)
+                                                                                               1.65
+  Differential (+ or –) voltage output offset        Bipolar zero out                                                     V
+                                                                                            (AVCC / 2)
+  Differential (+ or –) current output range
+                                                     Full-scale out                           3.783                       mAp-p
+  (Note *1)
+                                                     Bipolar zero out
+  Differential (+ or –) current output offset                                            2.112 – (1000 x
+                                                     to virtual ground                                                    mA
+  (Note *1)                                                                                 Vg) / 806
+                                                     at voltage Vg (V)
+Digital Filter Performance
+  De-emphasis error                                                                                             0.2      dB
+  Mute Attenuation                                                                             127                        dB
+PCM Filter Characteristics (Sharp Roll Off)
+                                                     0.003dB                                                  0.454fs    Hz
+  Pass band
+                                                     –3dB                                                      0.49fs     Hz
+ Stop band                                           < –115dB               0.546fs                                       Hz
+ Group Delay                                                                                  35 / fs                     s
+PCM Filter Characteristics (Slow Roll Off)
+                                                     0.05dB                                                   0.308fs    Hz
+  Pass band
+                                                     –3dB                                                      0.454fs    Hz
+ Stop band                                           < –100dB               0.814fs                                       Hz
+ Group Delay                                                                                 6.25 / fs                    s
+PCM Filter Characteristics (Minimum Phase)
+                                                     0.003dB                                                  0.454fs    Hz
+  Pass band
+                                                     –3dB                                                      0.49fs     Hz
+  Stop band                                          < –115dB               0.546fs                                       Hz
+
+Notes
+   *1. Differential (+ or –) current output is equivalent to a differential (+ or –) voltage source in series with an 806 11%
+       resistor. The differential (+ or –) voltage source has a peak-to-peak output range of 0.924 x AVCC = 3.05V and an
+       output offset of AVCC / 2 = 1.65V.
+   *2. With internal DVDD, maximum MCLK frequency is 50MHz (DVCC = +1.8V), or up to 100MHz (DVCC = +3.3V) using
+       an external +1.3V DVDD supply.
+   *3. Synchronous MCLK at 128 x FSR is also supported.
+
+
+
+
+     31       ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com
+ 3.7                                                                                                     April 22, 2021
+
+
+                                                                                ES9018K2M Datasheet
+
+PCM DE-EMPHASIS FILTER RESPONSE (32kHz)
+
+
+
+
+PCM DE-EMPHASIS FILTER RESPONSE (44.1kHz)
+
+
+
+
+PCM DE-EMPHASIS FILTER RESPONSE (48kHz)
+
+
+
+
+   ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com      32
+April 22, 2021                                                                                                     3.7
+
+
+ES9018K2M Datasheet
+
+PCM FILTER FREQUENCY RESPONSE
+
+
+
+
+dB
+
+
+
+
+dB
+
+
+
+
+dB
+
+
+
+
+                                                          Unit: fs
+
+
+
+
+     33    ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com
+ 3.7                                                                                                     April 22, 2021
+
+
+                                                                                ES9018K2M Datasheet
+
+PCM FILTER IMPULSE RESPONSE
+
+
+
+
+                                                    Unit: 1/fs (s)
+
+
+
+
+   ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com      34
+April 22, 2021                                                                                                     3.7
+
+
+ES9018K2M Datasheet
+
+DSD FILTER RESPONSE
+
+
+
+
+ dB
+
+
+
+
+                                          Unit: DATA_CLK (Hz) / 2822400
+
+
+
+
+      35   ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com
+ 3.7                                                                                                     April 22, 2021
+
+
+                                                                                ES9018K2M Datasheet
+
+28-Pin QFN Mechanical Dimensions
+
+
+
+
+   ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com      36
+  April 22, 2021                                                                                                          3.7
+
+
+ ES9018K2M Datasheet
+
+Example 28-Pin QFN Land Pattern
+
+
+
+
+Notes:
+   1. All dimensions are in millimeters.
+   2. Thermal vias should be 0.3mm to 0.33mm in diameter, with the barrel plated to 1oz copper.
+   3. For maximum solder mask in the corners, round the inner corners of each row.
+   4. Exposed pad should be solder mask defined.
+   5. Pad width can be reduced to 0.25mm if additional pad to pad clearance is required.
+   6. For applications where solder loss through vias is a concern, plugging or tenting of the vias should be used. The
+       solder mask diameter for each via should be 0.1mm larger than the via diameter.
+
+
+
+
+     37      ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com
+   3.7                                                                                                                    April 22, 2021
+
+
+                                                                                              ES9018K2M Datasheet
+
+Reflow Process Considerations
+For lead-free soldering, the characterization and optimization of the reflow process is the most important factor you need to
+consider.
+The lead-free alloy solder has a melting point of 217°C. This alloy requires a minimum reflow temperature of 235°C to
+ensure good wetting. The maximum reflow temperature is in the 245°C to 260°C range, depending on the package size
+(Table RPC-2). This narrows the process window for lead-free soldering to 10°C to 20°C.
+The increase in peak reflow temperature in combination with the narrow process window makes the development of an
+optimal reflow profile a critical factor for ensuring a successful lead-free assembly process. The major factors contributing to
+the development of an optimal thermal profile are the size and weight of the assembly, the density of the components, the
+mix of large and small components, and the paste chemistry being used.
+Reflow profiling needs to be performed by attaching calibrated thermocouples well adhered to the device as well as other
+critical locations on the board to ensure that all components are heated to temperatures above the minimum reflow
+temperatures and that smaller components do not exceed the maximum temperature limits (Table RPC-2).
+
+To ensure that all packages can be successfully and reliably assembled, the reflow profiles studied and recommended by
+ESS are based on the JEDEC/IPC standard J-STD-020 revision D.1.
+
+Figure RPC-1. IR/Convection Reflow Profile (IPC/JEDEC J-STD-020D.1)
+
+
+
+
+Note: Reflow is allowed 3 times. Caution must be taken to ensure time between re-flow runs does not exceed the allowed time by the
+moisture sensitivity label. If the time elapsed between the re-flows exceeds the moisture sensitivity time bake the board according to the
+moisture sensitivity label instructions.
+
+Manual Soldering:
+Allowed up to 2 times with maximum temperature of 350 degrees no longer than 3 seconds.
+
+
+
+
+      ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com                     38
+  April 22, 2021                                                                                                                                            3.7
+
+
+ ES9018K2M Datasheet
+
+Table RPC-1 Classification reflow profile
+
+ Profile Feature                                             Pb-Free Assembly
+ Preheat/Soak
+ Temperature Min (Tsmin)                                     150°C
+ Temperature Max (Tsmax)                                     200°C
+ Time (ts) from (Tsmin to Tsmax)                             60-120 seconds
+ Ramp-up rate (TL to Tp)                                     3°C / second max.
+ Liquidous temperature (TL)                                  217°C
+ Time (tL) maintained above TL                               60-150 seconds
+                                                             For users Tp must not exceed the classification temp in
+                                                             Table RPC-2.
+ Peak package body temperature (Tp)
+                                                             For suppliers Tp must equal or exceed the Classification
+                                                             temp in Table RPC-2.
+ Time (tp)* within 5°C of the specified
+ classification temperature (Tc),                            30* seconds
+ see Figure RPC-1
+ Ramp-down rate (Tp to TL)                                   6°C / second max.
+ Time 25°C to peak temperature                  8 minutes max.
+ * Tolerance for peak profile temperature (Tp) is defined as a supplier minimum and a user maximum.
+
+Note 1: All temperatures refer to the center of the package, measured on the package body surface that is facing up during assembly reflow (e.g., live-bug).
+       If parts are reflowed in other than the normal live-bug assembly reflow orientation (i.e., dead-bug), Tp shall be within ± 2°C of the live-bug Tp and still
+       meet the Tc requirements, otherwise, the profile shall be adjusted to achieve the latter. To accurately measure actual peak package body
+       temperatures refer to JEP140 for recommended thermocouple use.
+Note 2: Reflow profiles in this document are for classification/preconditioning and are not meant to specify board assembly profiles. Actual board assembly
+       profiles should be developed based on specific process needs and board designs and should not exceed the parameters in Table RPC-1.
+       For example, if Tc is 260°C and time tp is 30 seconds, this means the following for the supplier and the user.
+       For a supplier: The peak temperature must be at least 260°C. The time above 255°C must be at least 30 seconds.
+       For a user: The peak temperature must not exceed 260°C. The time above 255°C must not exceed 30 seconds.
+Note 3: All components in the test load shall meet the classification profile requirements.
+
+
+
+Table RPC-2 Pb-Free Process – Classification Temperatures (Tc)
+
+  Package Thickness               Volume mm3, <350                Volume mm3, 350 to 2000                  Volume mm3, >2000
+ <1.6 mm                                   260°C                                260°C                                260°C
+ 1.6 mm – 2.5 mm                           260°C                                250°C                                245°C
+ >2.5 mm                                   250°C                                245°C                                245°C
+Note 1: At the discretion of the device manufacturer, but not the board assembler/user, the maximum peak package body temperature (Tp) can exceed the
+       values specified in Table RPC-2. The use of a higher Tp does not change the classification temperature (Tc).
+Note 2: Package volume excludes external terminals (e.g., balls, bumps, lands, leads) and/or non-integral heat sinks.
+Note 3: The maximum component temperature reached during reflow depends on package thickness and volume. The use of convection reflow processes
+       reduces the thermal gradients between packages. However, thermal gradients due to differences in thermal mass of SMD packages may still exist.
+
+
+
+
+      39         ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com
+ 3.7                                                                                                          April 22, 2021
+
+
+                                                                                     ES9018K2M Datasheet
+
+ORDERING INFORMATION
+ Part Number             Description                                                      Package
+ ES9018K2M               Sabre32 Reference 32-bit Low Power Stereo Audio DAC              28-pin QFN
+ The letter K identifies the package type QFN.
+
+
+
+Revision History
+ Rev.   Date                     Notes
+ 1.4    June 6, 2014             Added SABRE SOUNDTM trademark
+                                 Updated ESS Technology FAX number. Added medical use disclaimer.
+ 1.5    July 22, 2014            Emphasized that Pin 20 and the Exposed Pad must be connected to Digital
+                                 Ground
+ 1.6    August 26, 2014          Added conditions when an external DVDD regulator is required
+                                 Corrected typo on Register#7 Bit [6:5], 3’dX changed to 2’dX.
+ 1.7    September 8, 2014        Identified Left and Right channels for Registers #15 and #16 respectively.
+                                 Updated DAC output impedance from 781.25 to 806
+ 1.8    September 24, 2014       Removed reference to Right Justified data format that is not supported
+ 1.9    October 1, 2014          Added details on the use of an external +1.3V DVDD supply
+                                 Updated Revision Identification from Chip Marking diagram.
+ 2.0    October 6, 2014
+                                 Added specification to the Absolute Maximum Ratings table
+ 2.1    October 16, 2014         Added table to Register #65 description
+ 2.2    December 1, 2014         Corrected value of differential current output range on page 29
+                                 Added details on decoupling required for the DVDD core supply.
+ 2.3    January 8, 2015
+                                 Deleted old revision history from 0.1 to 0.91.
+                                 Added notes on the connection of reserved Bits in the device control registers.
+ 2.4    March 16, 2015
+                                 Updated ESS contact information.
+ 2.5    April 30, 2015           Added information on THD compensation and how to use Registers #22 to #25
+ 2.6    June 10, 2015            Increased typical value of AVCC_L plus AVCC_R from 3mA to 8mA
+                                 Updated typical operating power on cover page.
+ 2.7    July 26, 2015            Corrected SDA setup time from SCL rising units from “µs” to “ns”.
+                                 Added new specifications to the Absolute Maximum Ratings table.
+ 2.8    April 12, 2016           Corrected typical power consumption values
+ 2.9    January 24, 2017         Corrected THD compensation description.
+ 3.0    January 31, 2017         Remove references to Revision W silicon, clarify I2C address description.
+                                 Added description for Registers #2, #3 and #9. Register #65 labeled as GPIO
+ 3.1    February 14, 2017
+                                 Status. Added register map. Adjusted page number references as needed.
+ 3.2    November 28, 2017        Remove ESS logo from pin diagram
+ 3.3    November 15, 2018        Added Low Power Audio DAC description, removed Advanced Information
+ 3.4    April 25, 2019           Added Cin / Co / Cclk information
+ 3.5    January 7, 2021          Updated I/V converter filter circuit
+ 3.6    March 26, 2021           Updated Register #9 default setting
+ 3.7    April 22, 2021           Update SABRE SOUND® technology
+
+
+
+
+    ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com          40
+April 22, 2021                                                                                                                                     3.7
+
+
+ES9018K2M Datasheet
+
+
+
+
+© 2021 ESS Technology, Inc.
+
+ESS IC's are not intended, authorized, or warranted for use as components in military applications, medical devices or life support systems. ESS
+assumes no liability whatsoever and disclaims any expressed, implied or statutory warranty for use of ESS IC's in such unsuitable applications.
+
+No part of this publication may be reproduced, stored in a retrieval system, transmitted, or translated in any form or by any means, electronic,
+mechanical, manual, optical, or otherwise, without the prior written permission of ESS Technology, Inc. ESS Technology, Inc. makes no representations
+or warranties regarding the content of this document. All specifications are subject to change without prior notice. ESS Technology, Inc. assumes no
+responsibility for any errors contained herein. U.S. patents pending.
+
+
+    41        ESS TECHNOLOGY, INC. 109 Bonaventura Drive, San Jose, CA 95134, USA. Tel (408) 643-8800 • www.esstech.com
+Mouser Electronics
+
+Authorized Distributor
+
+
+
+Click to View Pricing, Inventory, Delivery & Lifecycle Information:
+
+
+
+ESS Technology:
+ ES9018K2M
+

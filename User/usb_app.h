@@ -1,5 +1,11 @@
 #pragma once
 #include "debug.h"
+#include "stdbool.h"
+typedef enum{
+    FS_24000 = 24000,
+    FS_48000 = 48000,
+    FS_96000 = 96000
+}SAMPLE_RATE;
 
 
 const uint8_t *get_dev(uint8_t speed);
@@ -12,7 +18,7 @@ void CDC_WriteBlocking(uint8_t* buf,int size);
 void CDC_Notified_callback(uint8_t busid, uint8_t ep, uint32_t nbytes);
 void CDC_in_callback(uint8_t busid, uint8_t ep, uint32_t nbytes);
 void CDC_out_callback(uint8_t busid, uint8_t ep, uint32_t nbytes);
-void Audio_in_callback(uint8_t busid, uint8_t ep, uint32_t nbytes);
+void Audio_out_callback(uint8_t busid, uint8_t ep, uint32_t nbytes);
 
 void Audio_feedback_callback(uint8_t busid, uint8_t ep, uint32_t nbytes);
 

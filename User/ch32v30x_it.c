@@ -58,3 +58,13 @@ void TIM1_UP_IRQHandler(void)
   TIM_ClearITPendingBit(TIM1, TIM_IT_Update);
 }
 
+void DMA1_Channel5_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
+void DMA1_Channel5_IRQHandler(void){
+  if(DMA_GetITStatus(DMA1_IT_HT5) == SET){
+    DMA_ClearITPendingBit(DMA1_IT_HT5);
+  } 
+  else if(DMA_GetITStatus(DMA1_IT_TC5) == SET){
+    DMA_ClearITPendingBit(DMA1_IT_TC5);
+  }
+}
+

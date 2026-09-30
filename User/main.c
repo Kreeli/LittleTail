@@ -9,25 +9,29 @@
  * 立体声交错：[L0_hi][L0_lo][R0_hi][R0_lo]...
  */
 
-#define SINE_PERIOD     48u
-#define SINE_TX_LEN     (SINE_PERIOD * 2u * 2u)
+// #define FRAME_NUM     	96*4u//I2S缓冲区存放的数据量 96k采样率下，会有2ms延迟
+// #define I2S_BUF_SIZE     (FRAME_NUM * 2u * 2u)
 
-static uint16_t i2s_tx_buf[SINE_TX_LEN];
-static void Sine_BuildTx(void)
-{
-	uint32_t i;
+// static uint16_t i2s_tx_buf[I2S_BUF_SIZE];
+// extern bool g_update,g_mute;//静音
+// extern uint8_t g_volumn_db;
+// extern SAMPLE_RATE FS;
 
-	for (i = 0; i < SINE_PERIOD; i++) {
-		int32_t u = (int32_t)(sin(M_PI * 2 / SINE_PERIOD * i) * 0x7fffffff);
-		uint16_t hi = (uint16_t)(u >> 16);
-		uint16_t lo = (uint16_t)(u & 0xFFFFu);
+// static void Sine_BuildTx(void)
+// {
+// 	uint32_t i;
 
-		i2s_tx_buf[i * 4u + 0u] = hi;  /* L 高 16 */
-		i2s_tx_buf[i * 4u + 1u] = lo;  /* L 低 16 */
-		i2s_tx_buf[i * 4u + 2u] = hi;  /* R 高 16 */
-		i2s_tx_buf[i * 4u + 3u] = lo;  /* R 低 16 */
-	}
-}
+// 	for (i = 0; i < FRAME_NUM; i++) {
+// 		int32_t u = (int32_t)(sin(M_PI * 2 / FRAME_NUM * i) * 0x7fffffff);
+// 		uint16_t hi = (uint16_t)(u >> 16);
+// 		uint16_t lo = (uint16_t)(u & 0xFFFFu);
+
+// 		i2s_tx_buf[i * 4u + 0u] = hi;  /* L 高 16 */
+// 		i2s_tx_buf[i * 4u + 1u] = lo;  /* L 低 16 */
+// 		i2s_tx_buf[i * 4u + 2u] = hi;  /* R 高 16 */
+// 		i2s_tx_buf[i * 4u + 3u] = lo;  /* R 低 16 */
+// 	}
+// }
 
 int main(void)
 {
@@ -37,14 +41,10 @@ int main(void)
 	Syscfg();
 	Delay_Ms(100);
 	
-	Sine_BuildTx();
-	I2S2_DMA_Init(i2s_tx_buf, SINE_TX_LEN);
-	I2S2_DMA_Start();
-	ES9018_Init();
 	USB_init();
-	ES9018_SetVolume(40);
-	ES9018_SetBitCLKDIV(16);
+	ES9018_Init();
+	
+	
 	while (1) {
-		printf("hello\n");
 	}
 }

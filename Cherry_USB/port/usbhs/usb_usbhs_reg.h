@@ -43,6 +43,16 @@
 #define USBHS_UIF_DETECT            0x01
 #define USBHS_UIF_BUS_RST           0x01
 
+/*
+ * UIF_ISO_ACT 是 USBHS 独有的"同步活动"标志（USBFS 的 INT_FG 里没有这一位，
+ * 所以那套 USBFS 的 UAC 例程都不管它，照抄过来就会漏）。
+ * 踩过的坑：把它的中断使能（USBHS_UIE_ISO_ACT）打开，USB 中断会反复重入、
+ * CPU 被占满，表现是"设备在、串口打不开"。
+ * 本工程的做法：**不使能**它的中断，但每次进 USB 中断都写 1 把它清掉，
+ * 免得它一直挂着把同步端点的完成事件堵住。
+ */
+#define USBHS_UIF_TRANSFER_MASK     (USBHS_UIF_TRANSFER | USBHS_UIF_ISO_ACT)
+
 /* R8_USB_INT_ST */
 #define USBHS_UIS_IS_NAK            0x80
 #define USBHS_UIS_TOG_OK            0x40
@@ -117,6 +127,20 @@
 #define USBHS_UEP_R_RES_NAK         0x02
 #define USBHS_UEP_R_RES_STALL       0x03
 
+/*
+ * 收发两个方向的 TOG_AUTO 是同一个位（bit5），写代码时别被 T_/R_ 前缀绕进去。
+ *
+ * 同步(ISO)端点三条铁律（写错任何一条都会表现为"回调只进一次"或中断风暴）：
+ *   1. 翻转位固定 DATA0，**不能**带 TOG_AUTO：同步 OUT 的 PID 由主机固定为 DATA0，
+ *      自动翻转会让硬件第二次开始期待 DATA1 → TOG_OK=0 → 包被 ACK 掉但不上交；
+ *   2. 响应位（RES）只表示"这一包收不收/发不发"，同步端点不做握手。
+ *      本工程用 NYET 表示"已挂好"（TinyUSB 的 CH32 USBHS 端口写法）；
+ *      沁恒量产固件用 ACK，两种都能跑，见 usb_dc_usbhs.c 的 CH32_USBHS_ISO_RES；
+ *   3. UEPn_MAX_LEN **每个索引只有一份，收发共用**：同一索引的两个方向要不同
+ *      包长时（音频数据 1024 OUT / 反馈 4 IN）必须用不同索引。
+ */
+#define USBHS_UEP_TOG_AUTO          0x20
+
 /* Per-endpoint field accessors (WCH layout: TX_LEN u16 | TX_CTRL u8 | RX_CTRL u8) */
 #define ENDP_TX_LEN(ep)   (*((__IO uint16_t *)&(USBHSD->UEP0_TX_LEN) + (ep) * 2))
 #define ENDP_TX_CTRL(ep)  (*((__IO uint8_t *)&(USBHSD->UEP0_TX_CTRL) + (ep) * 4))
@@ -136,5 +160,14 @@ static inline __IO uint32_t *ENDP_RX_DMA_PTR(uint8_t ep)
 
 #define ENDP_T_EN_BIT(ep) ((uint32_t)1 << (ep))
 #define ENDP_R_EN_BIT(ep) ((uint32_t)1 << ((ep) + 16))
+
+/*
+ * R32_UEP_TYPE：bit n = UEPn_T_TYPE（发送/IN），bit n+16 = UEPn_R_TYPE（接收/OUT）。
+ * 置 1 表示该端点方向为同步(isochronous)传输，置 0 为控制/批量/中断。
+ * 同步端点不写这一位会被硬件当成批量端点，ISO 事务无法收发。
+ * （见 ch32v30x_usb.h 的 USBHS_UEPn_T_TYPE / USBHS_UEPn_R_TYPE 定义）
+ */
+#define ENDP_T_TYPE_BIT(ep) ((uint32_t)1 << (ep))
+#define ENDP_R_TYPE_BIT(ep) ((uint32_t)1 << ((ep) + 16))
 
 #endif /* USB_USBHS_REG_H */

@@ -4,7 +4,7 @@ void Syscfg(void){
 	I2C2_init();
 	ES9018_RST_Init();
 	HP_AMP_RST_Init();
-    //I2S2_ClockInit();
+    I2S2_ClockInit();
 	I2S2_Init();
     TIM1_Init();
 }
@@ -104,36 +104,11 @@ void TIM1_Init()
  *
  * SPI DATAR 16bit，每个 32bit 样点拆 2 个半字，先高 16 后低 16。
  */
-// void I2S2_Init(void)
-// {
-//     GPIO_InitTypeDef GPIO_InitStructure = {0};
-//     I2S_InitTypeDef  I2S_InitStructure = {
-//         .I2S_Mode = I2S_Mode_MasterTx,            /* 主机发送 */
-//         .I2S_Standard = I2S_Standard_Phillips,
-//         .I2S_DataFormat = I2S_DataFormat_32b,     /* 32bit */
-//         .I2S_MCLKOutput = I2S_MCLKOutput_Disable,
-//         .I2S_AudioFreq = I2S_AudioFreq_96k,
-//         .I2S_CPOL = I2S_CPOL_High
-//     };
-
-//     RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE);
-//     RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO | RCC_APB2Periph_GPIOB, ENABLE);
-
-//     /* WS/CK/SD：主机全部输出 */
-//     GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_12 | GPIO_Pin_13 | GPIO_Pin_15;
-//     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
-//     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-//     GPIO_Init(GPIOB, &GPIO_InitStructure);
-
-//     SPI_I2S_DeInit(SPI2);
-//     I2S_Init(SPI2, &I2S_InitStructure);
-// }
-
 void I2S2_Init(void)
 {
     GPIO_InitTypeDef GPIO_InitStructure = {0};
     I2S_InitTypeDef  I2S_InitStructure = {
-        .I2S_Mode = I2S_Mode_SlaveTx,            /* 主机发送 */
+        .I2S_Mode = I2S_Mode_MasterTx,            /* 主机发送 */
         .I2S_Standard = I2S_Standard_Phillips,
         .I2S_DataFormat = I2S_DataFormat_32b,     /* 32bit */
         .I2S_MCLKOutput = I2S_MCLKOutput_Disable,
@@ -144,31 +119,104 @@ void I2S2_Init(void)
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE);
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO | RCC_APB2Periph_GPIOB, ENABLE);
 
-    /* WS/CK：主机入 */
-    GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_12 | GPIO_Pin_13;
-    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IPD;
+    /* WS/CK/SD：主机全部输出 */
+    GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_12 | GPIO_Pin_13 | GPIO_Pin_15;
+    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_Init(GPIOB, &GPIO_InitStructure);
 
-    GPIO_InitStructure.GPIO_Pin   =  GPIO_Pin_15;
-    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
-    GPIO_Init(GPIOB, &GPIO_InitStructure);
-
+    SPI_I2S_DeInit(SPI2);
+    /* I2S_Init 内部按 SYSCLK 算 I2SPR，对 PLL3_VCO 源是错的。
+       这里传 Default 让它只写 I2SCFGR，分频交给 I2S_SetFs。 */
+    I2S_InitStructure.I2S_AudioFreq = I2S_AudioFreq_Default;
     I2S_Init(SPI2, &I2S_InitStructure);
+    I2S_SetFs(48000);
 }
+
+// void I2S2_Init(void)
+// {
+//     GPIO_InitTypeDef GPIO_InitStructure = {0};
+//     I2S_InitTypeDef  I2S_InitStructure = {
+//         .I2S_Mode = I2S_Mode_SlaveTx,            /* 主机发送 */
+//         .I2S_Standard = I2S_Standard_Phillips,
+//         .I2S_DataFormat = I2S_DataFormat_32b,     /* 32bit */
+//         .I2S_MCLKOutput = I2S_MCLKOutput_Disable,
+//         .I2S_AudioFreq = I2S_AudioFreq_96k,
+//         .I2S_CPOL = I2S_CPOL_High
+//     };
+
+//     RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE);
+//     RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO | RCC_APB2Periph_GPIOB, ENABLE);
+
+//     /* WS/CK：主机入 */
+//     GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_12 | GPIO_Pin_13;
+//     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IPD;
+//     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+//     GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+//     GPIO_InitStructure.GPIO_Pin   =  GPIO_Pin_15;
+//     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;
+//     GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+//     I2S_Init(SPI2, &I2S_InitStructure);
+// }
 
 void I2S2_ClockInit(void)
 {
     uint32_t guard = 1000000u;
-    RCC_PREDIV2Config(RCC_PREDIV2_Div1); /* 8MHz / 1 = 8MHz */
-    RCC_PLL3Config(RCC_PLL3Mul_10);      /* VCO = 8MHz * 10 = 80MHz */
+    //RCC_PREDIV2Config(RCC_PREDIV2_Div1); /* 8MHz / 1 = 4MHz */
+    /* VCO = 8MHz * 10 * 2 = 160MHz（VCO 输出是 ×2）
+     * 160M 对 48k/96k/192k 分频比 52/26/13，误差都是 +0.16%
+     * 不要用 Mul_6(96M)：N=31.25/15.625/7.8125 不整，96k/192k 会偏 -2.34% */
+    RCC_PLL3Config(RCC_PLL3Mul_10);
     RCC_PLL3Cmd(ENABLE);
     while ((RCC_GetFlagStatus(RCC_FLAG_PLL3RDY) == RESET) && (guard-- != 0u)) {
     }
     RCC_I2S2CLKConfig(RCC_I2S2CLKSource_PLL3_VCO);
 }
 
+/*
+ * 按 I2S2 实际时钟源写 I2SPR，设定 FRAME（LRCK）频率。
+ *
+ * 时钟：I2S2CLK = PLL3_VCO = 160 MHz（见 I2S2_ClockInit，不是 SYSCLK 144 MHz）
+ * 格式：32bit × 2ch → 每帧 64 个 BCLK，MCLK 不输出（ES9018 自带晶振）
+ *
+ *   BCLK = fI2S / (2*I2SDIV + ODD)
+ *   Fs   = BCLK / 64 = fI2S / (64 * (2*I2SDIV + ODD))
+ *   => N = 2*I2SDIV + ODD ≈ fI2S / (64 * Fs)
+ */
+#define I2S2_SRC_HZ  160000000u
 
+void I2S_SetFs(uint32_t freq)
+{
+    uint32_t n;
+    uint16_t i2sodd, i2sdiv, pr;
+    uint16_t cfgr;
+
+    if (freq == 0u) {
+        return;
+    }
+
+    /* N = round(fI2S / (64 * Fs)) */
+    n = (uint32_t)(((uint64_t)I2S2_SRC_HZ + 32u * (uint64_t)freq) / (64u * (uint64_t)freq));
+
+    i2sodd = (uint16_t)(n & 1u);
+    i2sdiv = (uint16_t)(n / 2u);
+
+    /* 硬件合法范围：I2SDIV ∈ [2, 255] */
+    if ((i2sdiv < 2u) || (i2sdiv > 0xFFu)) {
+        i2sdiv = 2u;
+        i2sodd = 0u;
+    }
+
+    pr = (uint16_t)(i2sdiv | (uint16_t)(i2sodd << 8) | I2S_MCLKOutput_Disable);
+
+    /* 改分频前先关 I2S，写完再恢复 */
+    cfgr = SPI2->I2SCFGR;
+    SPI2->I2SCFGR = (uint16_t)(cfgr & (uint16_t)~0x0400); /* I2SE = 0 */
+    SPI2->I2SPR = pr;
+    SPI2->I2SCFGR = cfgr;
+}
 static const uint16_t *s_i2s_buf;
 static uint16_t s_i2s_len;
 
@@ -199,7 +247,6 @@ void I2S2_DMA_Init(const uint16_t *buf, uint16_t halfword_count)
     DMA_InitStructure.DMA_Priority           = DMA_Priority_VeryHigh;
     DMA_InitStructure.DMA_M2M                = DMA_M2M_Disable;
     DMA_Init(DMA1_Channel5, &DMA_InitStructure);
-
     SPI_I2S_DMACmd(SPI2, SPI_I2S_DMAReq_Tx, ENABLE);
 }
 

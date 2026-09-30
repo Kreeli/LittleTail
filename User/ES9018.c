@@ -1,5 +1,6 @@
 #include "debug.h"
 #include "ES9018.h"
+#include "stdbool.h"
 void ES9018_WriteReg(uint8_t reg, uint8_t value){
     while(I2C_GetFlagStatus(I2C2, I2C_FLAG_BUSY) != RESET);
 
@@ -86,7 +87,7 @@ void ES9018_Init(void)
      * Reg0x01：32bit + I2S，固定 I2S 输入（auto=0）。
      * MCU 为 I2S 主机，ES9018 作从机接收。
      */
-    ES9018_WriteReg(ES9018_REG_INPUT_CONFIG, 0xF0); /* 32bit, LJmode I2S, 固定 I2S */
+    ES9018_WriteReg(ES9018_REG_INPUT_CONFIG, 0xE0); /* 32bit, I2S, 固定 I2S */
     ES9018_WriteReg(0x02, 0x18);
     ES9018_WriteReg(0x03, 0x10);
     ES9018_WriteReg(0x04, 0x00);
@@ -95,8 +96,8 @@ void ES9018_Init(void)
     ES9018_WriteReg(ES9018_REG_GENERAL_SETTINGS, 0x80 | ES9018_FILTER_SLOW_ROLLOFF); /* 不 mute */
     ES9018_WriteReg(0x08, 0x10);
 
-    /* Reg0x0A：从机（master_clk_enable=1），BCLK/LRCK 由 ES9018 提供 stop div = 16384 */
-    ES9018_WriteReg(ES9018_REG_MASTER_MODE_CTRL, 0xA0);
+    /* Reg0x0A：主机（master_clk_enable=0），stop div = 16384 */
+    ES9018_WriteReg(ES9018_REG_MASTER_MODE_CTRL, 0x00);//bit时钟又不是ES9018驱动的，所以这个无所谓
 
     ES9018_WriteReg(0x0B, 0x02);
     ES9018_WriteReg(0x0C, 0x5A);
