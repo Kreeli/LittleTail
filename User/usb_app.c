@@ -493,17 +493,18 @@ void Audio_SyncTick(void)
     s_tick_mf_last = s_usb_mf;
 
     /*
-     * 主机突然不送数据了 —— 电脑上"切换到别的输出设备"就是这样：
-     * 流停了，但不一定发 SET_INTERFACE(alt=0) 来关闭接口。此时 DMA 会一直
-     * 循环播放缓冲里最后那点音频，听起来就是"卡在原地发怪声"。
-     * 连续 10ms 收不到包就把缓冲清 0（数字静音），I2S 时钟照旧不停；
-     * 数据一旦回来，再把写指针重新对齐一次。
+     * 主机突然不送数据了 —— 电脑上"切换到别的输出设备"、或者任何 app/网页
+     * 开始/停止用音频时，Windows 都会把流停掉再重开。此时 DMA 会继续读缓冲，
+     * 但**只剩目标水位那点余量（4ms）**：超过 4ms 就开始重复播放旧数据，
+     * 听起来就是"卡一下/一段怪声"。
+     * 所以阈值取 **3ms**（比余量小，抢在重复旧数据之前把缓冲清成数字静音）；
+     * 数据一旦回来，再把写指针重新对齐一次。I2S 时钟照旧不停。
      */
     if (s_tick_mf == 0u) {
         if (s_idle_ticks < 255u) {
             s_idle_ticks++;
         }
-        if ((s_idle_ticks >= 10u) && (s_stream_idle == 0u)) {
+        if ((s_idle_ticks >= 3u) && (s_stream_idle == 0u)) {
             s_stream_idle = 1;
             memset(i2s_tx_buf, 0, sizeof(i2s_tx_buf));
         }
