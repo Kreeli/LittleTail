@@ -128,10 +128,13 @@ static volatile uint8_t  s_evt_open;
 static volatile uint8_t  s_evt_close;
 static volatile uint8_t  s_evt_fs;
 static volatile uint32_t s_evt_fs_val;
+static volatile uint32_t s_req_fs;     /* 非 0 = 主循环待处理的采样率变更请求 */
 static volatile uint32_t s_fs_hz = 48000u; /* 主机实际请求的采样率（GET_CUR 用它回答） */
 
 static void Audio_UpdateNominal(void); /* 定义在后面，这里先声明 */
 static void Audio_AlignWrite(void);    /* 定义在后面，这里先声明 */
+static void Audio_FsChangePoll(void);  /* 定义在后面，这里先声明 */
+static void CDC_TxPoll(void);          /* 定义在后面，这里先声明 */
 
 /* 反馈端点(设备->主机)的数据缓冲：高速下是 16.16 定点，单位 = 每微帧样点数。
  * 必须 4 字节对齐 —— usbd_ep_start_write() 对未对齐的地址直接返回错误，
@@ -275,35 +278,67 @@ void USBHS_IRQHandler(void){
     return;
 }
 
+/* ---------------------------------------------------------------------------
+ * CDC 发送：**环形缓冲 + 主循环轮询**
+ *
+ * 为什么这么设计：
+ *   usbd_ep_start_write() 只有在上一包发完（tx_busy==0）之后才能再调，
+ *   而主机什么时候来取 CDC IN 的数据是不确定的（终端没打开时可能永远不来）。
+ *   如果谁想打印就自己去等，那个上下文就被卡住 —— 如果那是 USB 中断，
+ *   音频直接卡顿；如果中途超时放弃，一条日志只发出去一半，看起来就是乱码。
+ *
+ * 所以：打印 = 往环形缓冲里塞字节（永不阻塞、永不半条），
+ *       实际发送由主循环 CDC_TxPoll() 做（每次发一包，发不出去就等下一轮）。
+ * 生产者只有主循环一个（中断里一律只置标志，见 CDC_cmd_proc），
+ * 所以 head/tail 不需要临界区。
+ * ------------------------------------------------------------------------- */
+#define CDC_TX_RING_SIZE  2048u                    /* 必须是 2 的幂 */
+#define CDC_TX_RING_MASK  (CDC_TX_RING_SIZE - 1u)
+
+static uint8_t  cdc_tx_ring[CDC_TX_RING_SIZE];
+static volatile uint16_t cdc_tx_head;              /* 生产者 = 主循环 */
+static volatile uint16_t cdc_tx_tail;              /* 消费者 = 主循环 */
+static volatile uint32_t cdc_tx_drop;              /* 缓冲满而丢掉的字节数 */
+
+/* 打印走的还是这个函数（_write 的落点），但已经改成"入队"，不再阻塞 */
 void CDC_WriteBlocking(uint8_t* buf,int size){
+    int i;
+
     if(size <= 0 || buf == NULL)
         return;
-    /* tx_buf 只有 512 字节；newlib 的 stdout 全缓冲时一次 flush 可能是 1024 字节，
-     * 不夹住就会写穿 tx_buf（踩坏后面的变量）。 */
-    if(size > (int)sizeof(tx_buf))
-        size = (int)sizeof(tx_buf);
 
-    /*
-     * **一字节都不等**：上一包还没发完就直接丢掉这次输出。
-     *
-     * 原来这里是"等 200 万次空转（≈70ms）"，问题很大：
-     *   - 终端没打开 / 主机没及时来取 CDC IN 时，tx_busy 一直是 1，
-     *     每次打印都要空转满超时；
-     *   - 而打印还可能发生在 **USB 中断里**（AS_OPEN/AS_CLOSE/FS_SET），
-     *     那就等于把 USB 中断卡住几十毫秒 —— 音频直接卡顿、CDC 输出也会被写坏
-     *     （打印内容前面出现乱码字节就是这个原因）。
-     * 日志本来就是诊断用的，丢几行无所谓；音频和 USB 才是要紧的。
-     * 打印请一律放到主循环（CDC_cmd_proc）里，不要放中断。
-     */
+    for (i = 0; i < size; i++) {
+        uint16_t next = (uint16_t)((cdc_tx_head + 1u) & CDC_TX_RING_MASK);
+
+        if (next == cdc_tx_tail) {                 /* 满了：丢掉这一包剩下的 */
+            cdc_tx_drop += (uint32_t)(size - i);
+            break;
+        }
+        cdc_tx_ring[cdc_tx_head] = buf[i];
+        cdc_tx_head = next;
+    }
+}
+
+/* 主循环里调用：把环形缓冲里的数据发给 CDC，一包最多 sizeof(tx_buf) 字节 */
+static void CDC_TxPoll(void){
+    uint16_t n = 0;
+
     if (tx_busy) {
-        return;                 /* 丢掉这一包：不阻塞任何上下文 */
+        return;                                    /* 上一包还没被主机取走 */
     }
 
-    memcpy(tx_buf,buf,size);
-    tx_busy = 1;
-    if (usbd_ep_start_write(0, EP_CDC_IN, tx_buf, size) != 0) {
-        tx_busy = 0;   // 没发出去，立刻放行
+    while ((n < (uint16_t)sizeof(tx_buf)) && (cdc_tx_tail != cdc_tx_head)) {
+        tx_buf[n++] = cdc_tx_ring[cdc_tx_tail];
+        cdc_tx_tail = (uint16_t)((cdc_tx_tail + 1u) & CDC_TX_RING_MASK);
+    }
+    if (n == 0u) {
         return;
+    }
+
+    tx_busy = 1;
+    if (usbd_ep_start_write(0, EP_CDC_IN, tx_buf, n) != 0) {
+        tx_busy = 0;                               /* 没发出去：把读指针退回去，下轮再发 */
+        cdc_tx_tail = (uint16_t)((cdc_tx_tail - n) & CDC_TX_RING_MASK);
     }
 }
 
@@ -330,10 +365,15 @@ void CDC_out_callback(uint8_t busid, uint8_t ep, uint32_t nbytes){
 
 void CDC_cmd_proc(void){//这个函数留给while主循环调用
     /*
-     * 中断里发生的事件在这里打印（中断里只置标志）：
-     * 主机是否在重开音频流、以及它请求的采样率是多少 —— 都只在这一处输出，
-     * 既不会卡住 USB 中断，也不会和 S, 行抢 CDC 端点导致输出乱码。
+     * 主循环轮询要做的事（中断里只置标志，重活都在这儿做）：
+     *   1) 把环形缓冲里的日志发给 CDC；
+     *   2) 打印中断里记下的事件（采样率请求 / 开流 / 关流）；
+     *   3) 采样率真的变了 -> 在这里做 I2S 重建（外设复位 + 对齐重启），
+     *      这一步有毫秒级的等待，绝不能放在 USB 中断里做。
      */
+    CDC_TxPoll();
+    Audio_FsChangePoll();
+
     if (s_evt_fs) {
         s_evt_fs = 0;
         printf("FS_SET,%u\n", (unsigned)s_evt_fs_val);
@@ -671,39 +711,55 @@ void usbd_audio_set_sampling_freq(uint8_t busid, uint8_t ep, uint32_t sampling_f
     s_fs_hz = sampling_freq;
 
     /*
-     * 主机每次开流都会发这个请求（哪怕采样率没变）。
-     * I2S_SetFs() 内部已经做了"分频没变就直接返回"的保护：
-     *   返回值 0 = 分频没改 → 这里等于什么都没做，**帧相位保持不动**（关键）✓
-     *   返回值 1 = 分频真的改了 → 只改 I2SPR 不够！SPI 里残留的 TX 缓冲/移位状态
-     *              会让新流错开一个半字（听起来就是"切换采样率后波形又乱"）。
-     *              所以这里做**彻底重建**：I2S2_Reinit() 走外设复位，
-     *              然后 DMA 与 I2S 一起、从缓冲第 0 个半字对齐启动。
+     * 这里在 **USB 中断** 里，只记录请求；真正的 I2S 重建交给主循环
+     * Audio_FsChangePoll() 做 —— 那里面有毫秒级等待（I2S2_DMA_Start 等第一个
+     * 半字进 TX 缓冲、外设复位），放在中断里会把 USB 卡住。
+     * 注意 s_fs_hz 必须在这里就更新：主机紧接着可能读 GET_CUR，回答必须一致。
      */
-    if (I2S_SetFs(sampling_freq) != 0u) {
+    s_req_fs = sampling_freq;
+    s_evt_fs_val = sampling_freq;
+    s_evt_fs = 1;
+
+    /* PC7 指示灯也顺手更新（纯 GPIO，不阻塞） */
+    Audio_UpdateFsLed();
+    return;
+}
+
+/*
+ * 采样率变更的后续处理（**主循环**调用，不在中断里）：
+ *   I2S_SetFs() 返回 0 = 分频没变 → 什么都不做，帧相位保持不动（关键）。
+ *   返回 1 = 分频真的改了 → 只改 I2SPR 不够：SPI 里残留的 TX 缓冲/移位状态
+ *   会让新流错开一个半字（"切换采样率后波形又乱"就是这个）。
+ *   所以做**彻底重建**：I2S2_Reinit() 走外设复位，然后 DMA 与 I2S 一起、
+ *   从缓冲第 0 个半字对齐启动。
+ */
+static void Audio_FsChangePoll(void)
+{
+    uint32_t freq = s_req_fs;
+
+    if (freq == 0u) {
+        return;
+    }
+    s_req_fs = 0;
+
+    if (I2S_SetFs(freq) != 0u) {
         NVIC_DisableIRQ(TIM2_IRQn);
         I2S2_DMA_Stop();
-        I2S2_Reinit(sampling_freq);       /* 外设复位 + 设成新分频，之后 I2S 是关的 */
+        I2S2_Reinit(freq);                /* 外设复位 + 新分频，结束时 I2S 是关的 */
         memset(i2s_tx_buf, 0, sizeof(i2s_tx_buf));
         i2s_write_idx = 0;
         i2s_read_idx = 0;
         s_level = 0;
         s_integral = 0.0f;
         s_err_last = 0.0f;
-        I2S2_DMA_Start(i2s_tx_buf, I2S_BUF_SIZE);   /* 对齐启动（等第一个半字进 TX 缓冲） */
+        I2S2_DMA_Start(i2s_tx_buf, I2S_BUF_SIZE);   /* 对齐启动 */
         NVIC_EnableIRQ(TIM2_IRQn);
     }
 
     Audio_UpdateNominal();
     s_fb_fixed = s_nominal_q16;
+    Audio_UpdateFsLed();
     g_update = true;
-
-    Audio_UpdateFsLed();          /* PC7：96k 灭，其它亮 */
-
-    /* 诊断：把实际请求的采样率打出来（手机到底要的是多少，一看就知道）。
-     * **只置标志**：这里在 USB 中断里，printf 会等 CDC 发送，把 USB 中断卡住。 */
-    s_evt_fs_val = sampling_freq;
-    s_evt_fs = 1;
-    return;
 }
 
 uint32_t usbd_audio_get_sampling_freq(uint8_t busid, uint8_t ep)

@@ -83,8 +83,14 @@ void TIM1_Init()
     TIM_ClearITPendingBit(TIM1, TIM_IT_Update);
 
     // 4. 配置 NVIC
+    /* 中断优先级规划（数字越小越优先）：
+     *   USBHS   preempt=0   一个微帧 125us，绝不能被拖
+     *   TIM2    preempt=1   1kHz 音频同步环（反馈 PID + 水位对齐）
+     *   TIM1    preempt=3   现在只清标志（PC7 已改成采样率指示，不再翻转）
+     *   DMA1_CH5 没开中断（不需要），handler 是空的
+     * USB 和 TIM2 的优先级分别在 usb_app.c / AUDIO_SYNC_TIM_Init 里设置。 */
     NVIC_InitStructure.NVIC_IRQChannel = TIM1_UP_IRQn;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 3;
     NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_InitStructure);
