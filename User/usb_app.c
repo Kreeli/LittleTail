@@ -74,8 +74,16 @@ static volatile uint16_t g_cdc_out_len = 0;   /* 上一次 CDC OUT 实际收到�
  * 这样 48k 和 96k 的余量（以时间计）一样：48k -> 768/384 半字，
  * 96k -> 1538/769 半字。缓冲数组按最坏情况（96k 8ms）开，见 Syscfg.h。
  */
-#define SYNC_TARGET_MS      4u
-#define SYNC_MARGIN_MS      2u
+/*
+ * 水位目标 / 安全区（毫秒）。**翻倍过**：4ms/2ms -> 8ms/4ms。
+ * 为什么：主机（尤其安卓）在忙的时候会有几十 ms 的 URB 提交延迟，
+ * 余量太小就会欠载。翻倍之后实测足够，且不增加可感延迟（还是毫秒级缓冲）。
+ *
+ * 注意 96k 下的上限：缓冲 3072 半字 = 8ms@96k，而目标水位夹取到"缓冲的一半"，
+ * 所以 96k 实际水位是 4ms 而不是 8ms。48k 下缓冲 16ms、目标 8ms，不受影响。
+ */
+#define SYNC_TARGET_MS      8u
+#define SYNC_MARGIN_MS      4u
 static int32_t s_target_level = 768;    /* 运行期由 Audio_UpdateFsDependent() 更新 */
 static int32_t s_safe_margin  = 384;
 static volatile uint8_t s_stream_idle;  /* 1 = 主机不送数据了（流停了但接口没关） */
@@ -130,6 +138,13 @@ static volatile uint8_t  s_evt_fs;
 static volatile uint32_t s_evt_fs_val;
 static volatile uint32_t s_req_fs;     /* 非 0 = 主循环待处理的采样率变更请求 */
 static volatile int32_t  s_lost;       /* 累计丢包数（期望 8 包/ms；上涨=真丢包） */
+/*
+ * 上溢（写指针撞读指针）保护触发次数。
+ * 由 Audio_out_callback() 的逐帧保护累加：水位已经顶到"写指针要追上读指针"时，
+ * 本包剩余数据直接丢弃并计数。正常情况下应该恒为 0；一旦上涨，说明主机灌得
+ * 比 DMA 播得快（或水位目标设得过大），可从串口遥测行观察。
+ */
+static volatile uint32_t s_overflow;
 static volatile uint32_t s_fs_hz = 48000u; /* 主机实际请求的采样率（GET_CUR 用它回答） */
 
 static void Audio_UpdateNominal(void); /* 定义在后面，这里先声明 */
@@ -187,8 +202,7 @@ static SAMPLE_RATE FS = FS_48000;
  * 甚至解析错乱（手机尤其明显）。这里离散采样率，MIN==MAX，分辨率写 1 即可。
  */
 static uint8_t g_audio_fs_table[] = {
-    WBVAL((0x0003)),
-    DBVAL(24000),DBVAL(24000),DBVAL(1),
+    WBVAL((0x0002)),
     DBVAL(48000),DBVAL(48000),DBVAL(1),
     DBVAL(96000),DBVAL(96000),DBVAL(1),
 };
@@ -736,10 +750,12 @@ void usbd_audio_set_sampling_freq(uint8_t busid, uint8_t ep, uint32_t sampling_f
         return;
     }
 
-    /* FS 只是给"分频读不到时的兜底标称"和 GET_CUR 用的，取最接近的一档 */
-    if (sampling_freq <= 24000u) {
-        FS = FS_24000;
-    } else if (sampling_freq <= 48000u) {
+    /*
+     * FS 只是给"分频读不到时的兜底标称"和 GET_CUR 用的，取最接近的一档。
+     * 本工程只对外声明 48k / 96k（24k 已移除），所以低于 48k 的请求按 48k 处理；
+     * 真正的分频仍按主机请求的频率算（见 I2S_SetFs），不会因为这里归到 48k 就跑错。
+     */
+    if (sampling_freq <= 48000u) {
         FS = FS_48000;
     } else {
         FS = FS_96000;
@@ -946,11 +962,37 @@ void Audio_out_callback(uint8_t busid, uint8_t ep, uint32_t nbytes){
     current_USB_audio_arr = (current_USB_audio_arr == (uint8_t*)USB_audio_buf[0])?USB_audio_buf[1]:USB_audio_buf[0];
     usbd_ep_start_read(busid,EP_AUDIO_OUT,current_USB_audio_arr,AUDIO_RX_SIZE);
 
-    /* 搬数据：**这个顺序就是标准，不要再动**（用户实测确认）。
-     *   缓冲里 = [样点高16位][样点低16位]  →  dest[0]=src[1], dest[1]=src[0]
-     * USB 送来的 32bit 样点是小端（内存里先低后高），而 I2S 是 MSB first，
-     * 所以这里交换一次。顺序反了 = 把样点低位当高位 = 满幅噪声（踩过）。 */
+    /*
+     * ===================== 逐帧上溢保护（写指针不得越过读指针）=====================
+     *
+     * 这是唯一会把**满幅噪声**送进耳机的事故：
+     *   写指针一旦绕过读指针，水位 lvl 的环形运算会把"很满"读成"很小"，
+     *   PI 反而让主机送得更快（反向死锁，永远回不来）；同时 DMA 播的是被
+     *   覆盖到一半的数据，波形全乱。突发情况下（主机猛灌一大包）就可能发生。
+     *
+     * 做法：**每写一帧（= 2 个 32bit 样点 = 4 个半字）之前**先算
+     *   "从写指针到读指针还有多少空位（环形）"，不够就停手、把本包剩下的丢掉。
+     * 正常水位下空位有一半以上，这段判断永远不成立。
+     * 丢掉的包计入 s_overflow，可用串口遥测行的"深水位保护次数"观察。
+     *
+     * 下溢方向（水位见底）由 Audio_SyncTick() 的欠载分支负责：
+     * 立即重对齐并把播放位置之后填 0，保证 DMA 播到的是数字静音。
+     */
     for(int i = 0;i<nbytes/2;i+=2){
+        int32_t space = (int32_t)i2s_read_idx - (int32_t)i2s_write_idx;
+
+        if (space <= 0) {
+            space += I2S_BUF_SIZE;          /* 环形回绕 */
+        }
+        if (space < 4) {                    /* 一帧 = 4 半字，放不下就丢弃 */
+            s_overflow++;
+            break;
+        }
+
+        /* 搬数据：**这个顺序就是标准，不要再动**（用户实测确认）。
+         *   缓冲里 = [样点高16位][样点低16位]  →  dest[0]=src[1], dest[1]=src[0]
+         * USB 送来的 32bit 样点是小端（内存里先低后高），而 I2S 是 MSB first，
+         * 所以这里交换一次。顺序反了 = 把样点低位当高位 = 满幅噪声（踩过）。 */
         dest_pt[i2s_write_idx+1] = src_pt[i];
         dest_pt[i2s_write_idx] = src_pt[i+1];
         i2s_write_idx = (2  + i2s_write_idx)%I2S_BUF_SIZE;

@@ -1,8 +1,9 @@
 #pragma once
 #include "debug.h"
 #include "stdbool.h"
+/* 采样率枚举：本工程只对外声明 48k / 96k（24k 已移除）。
+ * 仅用于"分频寄存器读不到时的兜底标称"，实际分频按主机请求值算。 */
 typedef enum{
-    FS_24000 = 24000,
     FS_48000 = 48000,
     FS_96000 = 96000
 }SAMPLE_RATE;
