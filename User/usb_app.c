@@ -129,8 +129,7 @@ static volatile uint8_t  s_evt_close;
 static volatile uint8_t  s_evt_fs;
 static volatile uint32_t s_evt_fs_val;
 static volatile uint32_t s_req_fs;     /* 非 0 = 主循环待处理的采样率变更请求 */
-static int32_t  s_fade_in;             /* 还要淡入多少个半字（开流/对齐后用） */
-static int32_t  s_fade_len;            /* 淡入总长度（半字） */
+static volatile int32_t  s_lost;       /* 累计丢包数（期望 8 包/ms；上涨=真丢包） */
 static volatile uint32_t s_fs_hz = 48000u; /* 主机实际请求的采样率（GET_CUR 用它回答） */
 
 static void Audio_UpdateNominal(void); /* 定义在后面，这里先声明 */
@@ -461,7 +460,7 @@ void CDC_cmd_proc(void){//这个函数留给while主循环调用
              * 第 10 列用来校验定时器频率：bInterval=1、tick=1kHz 时应该稳定是 8；
              * 第 11 列是主循环此刻现量的水位（锯齿是正常的）。
              */
-            printf("%d,%d,%u,%u,%d,%d,%.5f,%.5f,%u,%u,%d\n",
+            printf("%d,%d,%u,%u,%d,%d,%.5f,%.5f,%u,%u,%d,%d\n",
                    (int)s_level,                       /* 当前水位（半字） */
                    (int)s_target_level,                /* 目标水位 */
                    (unsigned)s_fb_fixed,               /* 反馈值 16.16 */
@@ -471,7 +470,8 @@ void CDC_cmd_proc(void){//这个函数留给while主循环调用
                    (double)PID.Kp, (double)PID.Ki,     /* 当前增益 */
                    (unsigned)s_underrun,               /* 欠载次数 */
                    (unsigned)s_tick_mf,                /* 本 tick 内的包数 */
-                   (int)lvl_now);                      /* 主循环现量的实时水位 */
+                   (int)lvl_now,                       /* 主循环现量的实时水位 */
+                   (int)s_lost);                       /* 累计丢包数 */
         }
     }
     return;
@@ -514,56 +514,6 @@ void Audio_Init(void)
 }
 
 /*
- * 淡入/淡出：避免"数字静音 <-> 音乐"之间硬跳变产生"咔/劈里啪啦"。
- *
- * 为什么需要：对齐时会把写指针对到"读指针 + 目标水位"并把这中间清 0，
- * 于是 DAC 听到的是 [旧数据] → [突然静音] → [突然音乐] 两个硬台阶，
- * 每个台阶都是一次爆音。开流/切设备时正好都在这个位置，所以"刚开始播放
- * 会劈里啪啦几下"。水位正常也不能避免 —— 它不是欠载，是波形不连续。
- *
- * 采样率 < 2*Fs 时用 1ms 的斜坡就够了，人耳听不出来。
- *
- * 注意缓冲里的样点是 [高16位][低16位] 两个半字（见 Audio_out_callback 的说明），
- * 一帧 = 4 个半字 = 左右两个样点，所以循环必须按 4 个半字一步走。
- */
-#define SYNC_FADE_MS   1u
-
-/* 把 [pos, pos+n) 这 n 个半字按斜坡缩放；fade_out=1 淡出、0 淡入 */
-static void Audio_FadeRange(int32_t pos, int32_t n, uint8_t fade_out)
-{
-    int32_t k;
-
-    if (n < 4) {
-        return;
-    }
-    n &= ~3;                                  /* 整帧对齐 */
-
-    for (k = 0; k < n; k += 2) {              /* 每 2 个半字 = 一个 32bit 样点 */
-        int32_t i  = (pos + k) % (int32_t)I2S_BUF_SIZE;
-        int32_t i2 = (i + 1) % (int32_t)I2S_BUF_SIZE;
-        int32_t lo = (uint16_t)i2s_tx_buf[i2];
-        int32_t hi = (int16_t)i2s_tx_buf[i];
-        int32_t v  = (hi << 16) | (lo & 0xFFFF);
-        int32_t g  = fade_out ? (255 - (k * 255) / n) : ((k * 255) / n);
-
-        v = (int32_t)(((int64_t)v * g) >> 8);
-        i2s_tx_buf[i]  = (int16_t)((uint32_t)v >> 16);
-        i2s_tx_buf[i2] = (int16_t)((uint32_t)v & 0xFFFF);
-    }
-}
-
-/* 采样率对应的淡入淡出长度（半字），至少一帧 */
-static int32_t Audio_FadeLen(void)
-{
-    int32_t n = s_target_level * (int32_t)SYNC_FADE_MS / SYNC_TARGET_MS;
-
-    if (n < 8) {
-        n = 8;
-    }
-    return n & ~3;
-}
-
-/*
  * 把写指针对到"读指针 + **目标水位**"之后（向上取整到 4 半字 = 1 帧），
  * 并把这段距离清成 0 —— 新数据到来之前 DAC 播的是静音，不会播到旧数据。
  *
@@ -601,24 +551,11 @@ static void Audio_AlignWrite(void)
         i2s_tx_buf[i + 3] = 0;
     }
 
-    /*
-     * 两个硬台阶都抹平：
-     *   1) 读指针往后 1ms 之内本来是"上一段音频"，紧接着就是清 0 —— 先淡出；
-     *   2) 新数据从写指针开始写，是完整幅度 —— 交给 ISO 回调做淡入（s_fade_in）。
-     * 这样 DAC 听到的是 旧音频 ->(1ms 淡出)-> 静音 ->(1ms 淡入)-> 新音频，
-     * 没有台阶就不会有"咔/劈里啪啦"。
-     */
-    Audio_FadeRange((rp + 3) & ~3, Audio_FadeLen(), 1);
-
     i2s_write_idx = (int16_t)(((end + 3) & ~3) % (int32_t)I2S_BUF_SIZE);  /* 新数据从这里开始写 */
     i2s_read_idx  = (int16_t)(rp % (int32_t)I2S_BUF_SIZE);
     s_level    = dist;
     s_integral = 0.0f;
     s_err_last = 0.0f;
-
-    /* 新数据淡入：ISO 回调会按这个长度把开头 1ms 做斜坡 */
-    s_fade_len = Audio_FadeLen();
-    s_fade_in  = s_fade_len;
 
     NVIC_EnableIRQ(USBHS_IRQn);
 }
@@ -646,6 +583,17 @@ void Audio_SyncTick(void)
     s_tick_ms++;                             /* 打印节拍用（主机暂停时也要继续打印） */
     s_tick_mf = s_usb_mf - s_tick_mf_last;   /* 本 tick 内收到的包数（打印用，校验定时器频率） */
     s_tick_mf_last = s_usb_mf;
+
+    /*
+     * 丢包统计：bInterval=1 时主机每毫秒正好发 8 个包（8kHz 微帧）。
+     * 累加"本 tick 少收/多收几个" —— 正常抖动（这 ms 少 1 个、下 ms 多 1 个）
+     * 会互相抵消，所以这个累计值上涨 = **真丢包**（同步传输丢了不会重传）。
+     * 丢一包 = 少 6~13 个样点 = 一声轻微"咔"，而水位 50ms 才采一次，看不出来。
+     * 主机停流（无音频会话）时不统计，否则会一路涨。
+     */
+    if (audio_open) {
+        s_lost += 8 - (int32_t)s_tick_mf;
+    }
 
     /*
      * 主机突然不送数据了 —— 电脑上"切换到别的输出设备"、或者任何 app/网页
@@ -942,6 +890,7 @@ void usbd_audio_open(uint8_t busid, uint8_t intf)
         s_tick_mf_last = 0;
         s_tick_mf = 0;
         s_underrun = 0;
+        s_lost = 0;
         Audio_UpdateNominal();
         s_fb_fixed = s_nominal_q16;   /* 第一包先给标称值，主机一取就有 */
 
@@ -1000,26 +949,10 @@ void Audio_out_callback(uint8_t busid, uint8_t ep, uint32_t nbytes){
     /* 搬数据：**这个顺序就是标准，不要再动**（用户实测确认）。
      *   缓冲里 = [样点高16位][样点低16位]  →  dest[0]=src[1], dest[1]=src[0]
      * USB 送来的 32bit 样点是小端（内存里先低后高），而 I2S 是 MSB first，
-     * 所以这里交换一次。顺序反了 = 把样点低位当高位 = 满幅噪声（踩过）。
-     *
-     * 开流/对齐之后的前 1ms（s_fade_in）做**淡入**：否则"数字静音 → 满幅音乐"
-     * 的硬台阶会在刚开始播放时"咔/劈里啪啦"几下（水位正常也躲不掉）。 */
+     * 所以这里交换一次。顺序反了 = 把样点低位当高位 = 满幅噪声（踩过）。 */
     for(int i = 0;i<nbytes/2;i+=2){
-        uint16_t hw_lo = src_pt[i];        /* USB 侧：先低后高 */
-        uint16_t hw_hi = src_pt[i+1];
-
-        if (s_fade_in > 0) {
-            int32_t v = (int32_t)((uint32_t)hw_lo | ((uint32_t)hw_hi << 16));
-            int32_t g = (int32_t)(((s_fade_len - s_fade_in) * 256) / s_fade_len) & 0xFF;
-
-            v = (int32_t)(((int64_t)v * g) >> 8);
-            hw_hi = (uint16_t)((uint32_t)v >> 16);
-            hw_lo = (uint16_t)((uint32_t)v & 0xFFFFu);
-            s_fade_in -= 2;
-        }
-
-        dest_pt[i2s_write_idx+1] = hw_lo;
-        dest_pt[i2s_write_idx] = hw_hi;
+        dest_pt[i2s_write_idx+1] = src_pt[i];
+        dest_pt[i2s_write_idx] = src_pt[i+1];
         i2s_write_idx = (2  + i2s_write_idx)%I2S_BUF_SIZE;
     }
 
