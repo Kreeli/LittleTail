@@ -68,15 +68,18 @@ static volatile uint16_t g_cdc_out_len = 0;   /* 上一次 CDC OUT 实际收到�
  *      DMA 是连续播的，瞬时水位是锯齿（峰峰值 ≈ 一包的半字数）。
  *      所以就在 ISO OUT 回调里、刚搬完数据之后量，每微帧一次、相位固定。
  * ========================================================================= */
-#define SYNC_TARGET_LEVEL   (I2S_BUF_SIZE / 2u)   /* 目标水位：缓冲一半（48k 下 4ms） */
 /*
- * 打开音频流时，写指针要落在"当前播放位置 + 这个安全距离"之后，而不是从 0 开始。
- * 因为 I2S+DMA 从开机起就一直跑、永不停止，读指针随时在走：
- *   - 必须留出安全距离，新数据才不会"追不上"播放位置；
- *   - 还必须 4 半字（=1 帧）对齐，否则左右声道/高低半字会错位（听起来是噪声）。
- * 取目标水位的一半 —— 48k 下 2ms。
+ * 目标水位 / 安全区：**按时间算，不按半字数算**，运行期随采样率更新。
+ *   目标水位 = 4ms 的数据量；安全区 = 2ms。
+ * 这样 48k 和 96k 的余量（以时间计）一样：48k -> 768/384 半字，
+ * 96k -> 1538/769 半字。缓冲数组按最坏情况（96k 8ms）开，见 Syscfg.h。
  */
-#define SYNC_SAFE_MARGIN    (SYNC_TARGET_LEVEL / 2u)
+#define SYNC_TARGET_MS      4u
+#define SYNC_MARGIN_MS      2u
+static int32_t s_target_level = 768;    /* 运行期由 Audio_UpdateFsDependent() 更新 */
+static int32_t s_safe_margin  = 384;
+static volatile uint8_t s_stream_idle;  /* 1 = 主机不送数据了（流停了但接口没关） */
+static uint8_t s_idle_ticks;            /* 连续多少个 tick 没收到包 */
 
 #define SYNC_KP_DEFAULT     0.001    /* 实测可用的一组系数，也可以用串口发 p=/i=/d= 在线调 */
 #define SYNC_KI_DEFAULT     0.0004
@@ -367,11 +370,11 @@ void CDC_cmd_proc(void){//这个函数留给while主循环调用
              */
             printf("%d,%d,%u,%u,%d,%d,%.5f,%.5f,%u,%u\n",
                    (int)s_level,                       /* 当前水位（半字） */
-                   (int)SYNC_TARGET_LEVEL,             /* 目标水位 */
+                   (int)s_target_level,                /* 目标水位 */
                    (unsigned)s_fb_fixed,               /* 反馈值 16.16 */
                    (unsigned)s_nominal_q16,            /* 标称值 16.16 */
                    (int)(s_corr_last * 1000000.0f),    /* PID 修正量 ×1e6 */
-                   (int)((float)SYNC_TARGET_LEVEL - (float)s_level),  /* 误差 */
+                   (int)((float)s_target_level - (float)s_level),  /* 误差 */
                    (double)PID.Kp, (double)PID.Ki,     /* 当前增益 */
                    (unsigned)s_underrun,               /* 欠载次数 */
                    (unsigned)s_tick_mf);               /* 本 tick 内的包数 */
@@ -406,6 +409,11 @@ void Audio_Init(void)
     memset(i2s_tx_buf, 0, sizeof(i2s_tx_buf));
     i2s_write_idx = 0;
     i2s_read_idx  = 0;
+    s_usb_mf = 0;
+    s_tick_mf_last = 0;
+    s_stream_idle = 0;
+    s_idle_ticks = 0;
+    Audio_UpdateNominal();          /* 顺便把目标水位/安全区按当前采样率算好 */
 
     I2S2_DMA_Init(i2s_tx_buf, I2S_BUF_SIZE);
     I2S2_DMA_Start(i2s_tx_buf, I2S_BUF_SIZE);
@@ -424,7 +432,7 @@ static void Audio_AlignWrite(void)
     NVIC_DisableIRQ(USBHS_IRQn);
 
     rp  = Audio_ReadPos();
-    end = rp + (int32_t)SYNC_SAFE_MARGIN;
+    end = rp + s_safe_margin;
 
     /* 安全区填 0：4 半字一步（缓冲长度是 4 的倍数，所以 i..i+3 不会跨出数组） */
     for (k = (rp + 3) & ~3; k < end; k += 4) {
@@ -437,7 +445,7 @@ static void Audio_AlignWrite(void)
 
     i2s_write_idx = (int16_t)(((end + 3) & ~3) % (int32_t)I2S_BUF_SIZE);  /* 新数据从这里开始写 */
     i2s_read_idx  = (int16_t)(rp % (int32_t)I2S_BUF_SIZE);
-    s_level    = (int32_t)SYNC_SAFE_MARGIN;
+    s_level    = s_safe_margin;
     s_integral = 0.0f;
     s_err_last = 0.0f;
 
@@ -467,6 +475,29 @@ void Audio_SyncTick(void)
     s_tick_mf = s_usb_mf - s_tick_mf_last;   /* 本 tick 内收到的包数（打印用，校验定时器频率） */
     s_tick_mf_last = s_usb_mf;
 
+    /*
+     * 主机突然不送数据了 —— 电脑上"切换到别的输出设备"就是这样：
+     * 流停了，但不一定发 SET_INTERFACE(alt=0) 来关闭接口。此时 DMA 会一直
+     * 循环播放缓冲里最后那点音频，听起来就是"卡在原地发怪声"。
+     * 连续 10ms 收不到包就把缓冲清 0（数字静音），I2S 时钟照旧不停；
+     * 数据一旦回来，再把写指针重新对齐一次。
+     */
+    if (s_tick_mf == 0u) {
+        if (s_idle_ticks < 255u) {
+            s_idle_ticks++;
+        }
+        if ((s_idle_ticks >= 10u) && (s_stream_idle == 0u)) {
+            s_stream_idle = 1;
+            memset(i2s_tx_buf, 0, sizeof(i2s_tx_buf));
+        }
+    } else {
+        if (s_stream_idle != 0u) {
+            s_stream_idle = 0;
+            Audio_AlignWrite();          /* 数据回来了：写指针重新对齐到安全位置 */
+        }
+        s_idle_ticks = 0;
+    }
+
     if (!audio_open) {
         return;
     }
@@ -488,7 +519,7 @@ void Audio_SyncTick(void)
      *   corr = Kp*err + Ki*∫err dt + Kd*derr/dt   （帧/微帧）
      * dt = SYNC_TICK_DT（定时器周期，常量）
      */
-    err = (float)SYNC_TARGET_LEVEL - (float)s_level;
+    err = (float)s_target_level - (float)s_level;
 
     s_integral += err * SYNC_TICK_DT;
     if (s_integral >  SYNC_INTEG_LIMIT) s_integral =  SYNC_INTEG_LIMIT;
@@ -671,6 +702,34 @@ static void Audio_SendFeedback(uint8_t busid){
  *   16.16 = 312.5*65536/N = 20480000/N —— 纯整数，避免浮点和取整误差。
  *   48k(N=52) -> 393846 = 6.009615 帧/微帧（主机就会按这个速率送数）。
  */
+/*
+ * 目标水位/安全区按"时间"折成半字数（采样率变了要跟着变，否则 96k 下余量只有一半）：
+ *   每毫秒的数据量 = fS/1000 帧 = 该值 × 4 个半字
+ *   48k -> 769/384 半字      96k -> 1538/769 半字
+ * 上限是缓冲的一半（缓冲按 96k 8ms 开，见 Syscfg.h）。
+ */
+static void Audio_UpdateFsDependent(void)
+{
+    uint32_t fs = I2S_GetRealFs();
+    uint32_t per_ms;
+
+    if (fs == 0u) {
+        fs = (uint32_t)FS;
+    }
+    per_ms = fs * 4u / 1000u;                        /* 每毫秒多少半字 */
+
+    s_target_level = (int32_t)(per_ms * SYNC_TARGET_MS);
+    s_safe_margin  = (int32_t)(per_ms * SYNC_MARGIN_MS);
+
+    if (s_target_level > (int32_t)(I2S_BUF_SIZE / 2u)) {
+        s_target_level = (int32_t)(I2S_BUF_SIZE / 2u);
+    }
+    if (s_safe_margin >= s_target_level) {
+        s_safe_margin = s_target_level / 2;
+    }
+    s_safe_margin &= ~3;                             /* 4 半字 = 1 帧对齐 */
+}
+
 static void Audio_UpdateNominal(void)
 {
     uint16_t n = I2S_GetDivN();
@@ -681,6 +740,8 @@ static void Audio_UpdateNominal(void)
         /* 分频寄存器读不到就退回整数标称，至少不至于完全错 */
         s_nominal_q16 = (uint32_t)(((uint32_t)FS / 8000u) << 16);
     }
+
+    Audio_UpdateFsDependent();      /* 目标水位/安全区跟着采样率走 */
 }
 
 void usbd_audio_open(uint8_t busid, uint8_t intf)

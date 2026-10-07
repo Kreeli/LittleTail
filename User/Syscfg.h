@@ -35,8 +35,8 @@ uint16_t I2S_GetDivN(void);
 uint32_t I2S_GetRealFs(void);
 
 /* I2S 播放缓冲（单位：半字 = int16_t 个数 = 4 个半字/样点帧）。
- * 延时 = I2S_BUF_HALFWORDS / (4 * fS) 秒：
- *   48k(默认) -> 8ms      96k -> 4ms      24k -> 16ms
- * 缓冲越大越不容易欠载/溢出，代价是延迟和 3KB RAM。
- * 主机送数速率和本机采样率之间总有 ppm 级偏差，缓冲太小根本没法用 PID 稳住。 */
-#define I2S_BUF_HALFWORDS   1536u
+ * 按**最坏情况（96k）**开 8ms：96k -> 8ms，48k -> 16ms，24k -> 32ms。
+ * 实际用的水位不取缓冲一半，而是按时间算的 4ms（见 usb_app.c 的
+ * Audio_UpdateFsDependent()）：48k 768 半字、96k 1538 半字，
+ * 这样两种采样率的时间余量一致，96k 不会因为余量只有一半而频繁欠载。 */
+#define I2S_BUF_HALFWORDS   3072u
