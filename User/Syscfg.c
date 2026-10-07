@@ -361,12 +361,14 @@ void I2S2_DMA_Stop(void)
  * 参考 TIM1 的配置方式（见上面的 TIM1_Init）。
  *
  * 时钟：TIM1 在 APB2 上跑 144MHz（你的 TIM1_Init 用 14400 分频得到 10kHz，
- * 正好说明它的定时器时钟是 144MHz）。TIM2 在 APB1 上，按你说的分频后是 72MHz。
- * 如果实际不是 72MHz，改 SYNC_TIMER_CLK_HZ 即可；
- * 校验方法：看串口打印行最后一列（本 tick 收到几个音频包），
- * bInterval=1、1kHz tick 时应该稳定显示 8；显示 4 就说明时钟是这里写的两倍。
+ * 正好说明它的定时器时钟是 144MHz）。TIM2 在 APB1 上，同样是 144MHz（见下）。
  * ------------------------------------------------------------------------- */
-#define SYNC_TIMER_CLK_HZ   72000000u
+/* TIM2 的时钟：CH32V3 上 APB1 分频系数 ≠1 时，定时器时钟 = APB1 × 2。
+ * APB1 = 72MHz -> TIM2 = **144MHz**（不是 72MHz）。
+ * 实测确认：bInterval=1 时主机每毫秒 8 个包，而 S, 行最后一列读到 4，
+ * 说明临时中断频率是 1kHz 的 2 倍 —— 之前这里写 72MHz，实际 tick 是 2kHz，
+ * PID 里的 dt 也就错了一倍（积分作用偏强一倍）。改成 144MHz 后 tick 才是真 1kHz。 */
+#define SYNC_TIMER_CLK_HZ   144000000u
 
 void AUDIO_SYNC_TIM_Init(void)
 {

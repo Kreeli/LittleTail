@@ -122,6 +122,7 @@ static float    s_err_last;            /* 上一次误差（D 项用） */
 static float    s_corr_last;           /* 最近一次修正量（帧/微帧），只给打印看 */
 static uint32_t s_tick_mf;             /* 上两个 tick 之间收到多少包（校验定时器频率） */
 static uint32_t s_tick_mf_last;        /* 上次统计时的包数 */
+static volatile uint32_t s_tick_ms;    /* TIM2 tick 计数（1kHz 时约等于毫秒） */
 static volatile uint32_t s_fs_hz = 48000u; /* 主机实际请求的采样率（GET_CUR 用它回答） */
 
 static void Audio_UpdateNominal(void); /* 定义在后面，这里先声明 */
@@ -356,12 +357,13 @@ void CDC_cmd_proc(void){//这个函数留给while主循环调用
         }
 	}
     /* 调试输出：不要每次主循环都打（1kHz 会把串口淹掉，也拖慢同步环）。
-     * 每 400 个微帧（50ms）打一行同步状态，方便在 VOFA 里看水位和反馈值。 */
+     * 节拍用 TIM2 的 tick 计数（不是收到的包数）—— 这样主机停流/暂停的时候
+     * 打印照旧进行，才能看出"卡一下"到底持续了几行（= 多少毫秒）。 */
     {
-        static uint32_t s_last_print_mf;
+        static uint32_t s_last_print_ms;
 
-        if ((uint32_t)(s_usb_mf - s_last_print_mf) >= 400u) {
-            s_last_print_mf = s_usb_mf;
+        if ((uint32_t)(s_tick_ms - s_last_print_ms) >= 50u) {
+            s_last_print_ms = s_tick_ms;
             /*
              * 列：水位, 目标, 反馈值(16.16), 标称(16.16), 修正(1e-6 帧/微帧),
              *     误差(半字), Kp, Ki, 欠载次数, 本tick收到包数
@@ -486,6 +488,7 @@ void Audio_SyncTick(void)
      * 复位只能在**没有时钟**的时候做（即 ES9018_Init()，那时 I2S 还没启动）。
      */
 
+    s_tick_ms++;                             /* 打印节拍用（主机暂停时也要继续打印） */
     s_tick_mf = s_usb_mf - s_tick_mf_last;   /* 本 tick 内收到的包数（打印用，校验定时器频率） */
     s_tick_mf_last = s_usb_mf;
 
