@@ -119,6 +119,7 @@ static float    s_err_last;            /* 上一次误差（D 项用） */
 static float    s_corr_last;           /* 最近一次修正量（帧/微帧），只给打印看 */
 static uint32_t s_tick_mf;             /* 上两个 tick 之间收到多少包（校验定时器频率） */
 static uint32_t s_tick_mf_last;        /* 上次统计时的包数 */
+static volatile uint32_t s_fs_hz = 48000u; /* 主机实际请求的采样率（GET_CUR 用它回答） */
 
 static void Audio_UpdateNominal(void); /* 定义在后面，这里先声明 */
 static void Audio_AlignWrite(void);    /* 定义在后面，这里先声明 */
@@ -166,11 +167,17 @@ static const struct usb_descriptor s_desc = {//回调函数的结构体
 
 static SAMPLE_RATE FS = FS_48000;
 
+/*
+ * 采样率表（Clock Source 的 Sampling Frequency Control 返回的 RANGE 结构）：
+ *   [wNumSubRanges] 然后每个子范围 3 个 32bit：wMIN, wMAX, wRES
+ * 注意 wRES 不能是 0 —— 规范里它是"分辨率"，必须 ≥1；写 0 有些主机会算不出来
+ * 甚至解析错乱（手机尤其明显）。这里离散采样率，MIN==MAX，分辨率写 1 即可。
+ */
 static uint8_t g_audio_fs_table[] = {
     WBVAL((0x0003)),
-    DBVAL(24000),DBVAL(24000),DBVAL(0),
-    DBVAL(48000),DBVAL(48000),DBVAL(0),
-    DBVAL(96000),DBVAL(96000),DBVAL(0),
+    DBVAL(24000),DBVAL(24000),DBVAL(1),
+    DBVAL(48000),DBVAL(48000),DBVAL(1),
+    DBVAL(96000),DBVAL(96000),DBVAL(1),
 };
 
 static PID_struct PID = {
@@ -549,26 +556,35 @@ void usbd_audio_set_sampling_freq(uint8_t busid, uint8_t ep, uint32_t sampling_f
 {
     (void)busid;
     (void)ep;
-    switch (sampling_freq) {
-        case 24000:
-            FS = FS_24000;
-            break;
-        case 48000:
-            FS = FS_48000;
-            break;
-        case 96000:
-            FS = FS_96000;
-            break;
-        default:
-            return;    /* 不支持的采样率：不改时钟，直接退回 */
+
+    /*
+     * **不认识的采样率也要接受**（以前是直接 return，那会让主机以为切成功了、
+     * 而 I2S 还在旧频率上跑 → 数据流和本机时钟对不上 → 一团噪声，
+     * 手机插上来就是这个下场之一）。I2S 是整数分频，任何频率都能凑一个最接近的
+     * 分频比；偏差由反馈+PID 去补，比"完全不理它"好得多。
+     * 只挡明显不合理的值。
+     */
+    if ((sampling_freq < 8000u) || (sampling_freq > 192000u)) {
+        return;
     }
+
+    /* FS 只是给"分频读不到时的兜底标称"和 GET_CUR 用的，取最接近的一档 */
+    if (sampling_freq <= 24000u) {
+        FS = FS_24000;
+    } else if (sampling_freq <= 48000u) {
+        FS = FS_48000;
+    } else {
+        FS = FS_96000;
+    }
+    s_fs_hz = sampling_freq;
+
     /*
      * 主机每次开流都会发这个请求（哪怕采样率没变）。
      * I2S_SetFs() 内部已经做了"分频没变就直接返回"的保护：
      *   返回值 0 = 分频没改 → 这里等于什么都没做，**帧相位保持不动**（关键）✓
      *   返回值 1 = 分频真的改了 → I2S 被关/开过，帧相位已经是随机值，
      *              必须把 DMA 一起对齐重启：清缓冲 + 从 index 0 重新起 DMA
-     *              （保证帧相位从缓冲第 0 个半字开始），写指针归 0 让上层重新预填。
+     *              （保证帧相位从缓冲第 0 个半字开始），写指针归 0。
      */
     if (I2S_SetFs(sampling_freq) != 0u) {
         NVIC_DisableIRQ(TIM2_IRQn);
@@ -577,6 +593,8 @@ void usbd_audio_set_sampling_freq(uint8_t busid, uint8_t ep, uint32_t sampling_f
         i2s_write_idx = 0;
         i2s_read_idx = 0;
         s_level = 0;
+        s_integral = 0.0f;
+        s_err_last = 0.0f;
         I2S2_DMA_Start(i2s_tx_buf, I2S_BUF_SIZE);   /* DMA 与 I2S 一起、对齐启动 */
         NVIC_EnableIRQ(TIM2_IRQn);
     }
@@ -584,6 +602,9 @@ void usbd_audio_set_sampling_freq(uint8_t busid, uint8_t ep, uint32_t sampling_f
     Audio_UpdateNominal();
     s_fb_fixed = s_nominal_q16;
     g_update = true;
+
+    /* 诊断：把实际请求的采样率打出来（手机到底要的是多少，一看就知道） */
+    printf("FS_SET,%u\n", (unsigned)sampling_freq);
     return;
 }
 
@@ -592,7 +613,9 @@ uint32_t usbd_audio_get_sampling_freq(uint8_t busid, uint8_t ep)
     (void)busid;
     (void)ep;
 
-    return FS;
+    /* 回主机"我们现在实际跑多少"，而不是那个三档枚举 —— 手机可能请求 44.1k 之类，
+     * 我们也照单接受（见 set_sampling_freq），回答必须一致，否则主机会来回切。 */
+    return s_fs_hz;
 }
 
 void usbd_audio_get_sampling_freq_table(uint8_t busid, uint8_t ep, uint8_t **sampling_freq_table)
