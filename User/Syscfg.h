@@ -16,6 +16,10 @@ void I2S2_Init(void);
 uint8_t I2S_SetFs(uint32_t freq);
 void I2S2_DMA_Init(const uint16_t *buf, uint16_t halfword_count);
 void I2S2_DMA_Start(const uint16_t *buf, uint16_t halfword_count);
+/* 彻底重建 I2S 外设（含外设复位 SPI_I2S_DeInit）并把分频设为 freq；
+ * 结束时 I2S 是关着的，交给 I2S2_DMA_Start() 在"第一个半字已进 TX 缓冲"之后再使能。
+ * 采样率切换后必须用它 —— 只改 I2SPR 会因为 SPI 里残留的半个字导致波形错乱。 */
+void I2S2_Reinit(uint32_t freq);
 void I2S2_DMA_Stop(void);
 void I2S2_DMA_Recover(void);
 uint8_t I2S2_Underrun(void);

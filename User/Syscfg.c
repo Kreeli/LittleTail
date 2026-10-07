@@ -285,6 +285,8 @@ uint8_t I2S_SetFs(uint32_t freq)
 
 void I2S2_DMA_Start(const uint16_t *buf, uint16_t halfword_count)
 {
+    uint32_t guard = 200000u;
+
     SPI_I2S_ClearFlag(SPI2, I2S_FLAG_UDR);
     SPI_I2S_ClearFlag(SPI2, SPI_I2S_FLAG_OVR);
 
@@ -293,7 +295,50 @@ void I2S2_DMA_Start(const uint16_t *buf, uint16_t halfword_count)
     DMA1_Channel5->MADDR = (uint32_t)buf;
     DMA_Cmd(DMA1_Channel5, ENABLE);
 
+    /*
+     * **先等 DMA 把第一个半字搬进 SPI 的 TX 缓冲，再使能 I2S。**
+     *
+     * 这一步是"帧相位确定性"的关键：如果 I2S 先开、TX 缓冲还是空的，
+     * 第一帧会先吐一个 0（或残留值），于是整条流永久错开一个半字 ——
+     * 表现就是"有时候正常、有时候声道错乱/噪声"，而且每次上电结果都可能不同。
+     * 等到了再开，第一个半字一定是 buf[0]，帧边界从它开始。
+     * 如果硬件在 I2SE=0 时不产生 DMA 请求，这里会退化成原来的行为（最多等 ~200us）。
+     */
+    while ((DMA_GetCurrDataCounter(DMA1_Channel5) == halfword_count) && (--guard != 0u)) {
+    }
+
     I2S_Cmd(SPI2, ENABLE);
+}
+
+/*
+ * 彻底重建 I2S 外设（采样率切换后必须走这条）：
+ *   SPI_I2S_DeInit() 是**外设复位**，会把 SPI 的 TX 缓冲/移位寄存器等内部状态
+ *   全部清掉；只改 I2SPR 是不够的 —— 残留的半个字会让新流错开一格，
+ *   听起来就是"切换采样率之后波形又乱了"。
+ *
+ * 结束时 **I2S 保持关闭**，由 I2S2_DMA_Start() 在"第一个半字已经进 TX 缓冲"
+ * 之后再使能，保证帧相位从缓冲第 0 个半字开始。
+ */
+void I2S2_Reinit(uint32_t freq)
+{
+    I2S_InitTypeDef cfg = {
+        .I2S_Mode = I2S_Mode_MasterTx,
+        .I2S_Standard = I2S_Standard_Phillips,
+        .I2S_DataFormat = I2S_DataFormat_32b,
+        .I2S_MCLKOutput = I2S_MCLKOutput_Disable,
+        .I2S_AudioFreq = I2S_AudioFreq_Default,   /* 分频自己算，见 I2S_SetFs */
+        .I2S_CPOL = I2S_CPOL_High                 /* 基准值，和 I2S2_Init 保持一致 */
+    };
+
+    I2S_Cmd(SPI2, DISABLE);
+    DMA_Cmd(DMA1_Channel5, DISABLE);
+
+    SPI_I2S_DeInit(SPI2);                 /* 外设复位：内部状态全清 */
+    I2S_Init(SPI2, &cfg);                 /* 只写 I2SCFGR；I2SPR 由下面算 */
+    (void)I2S_SetFs(freq);                /* 写分频（这里会关/开一次，无所谓） */
+    SPI_I2S_DMACmd(SPI2, SPI_I2S_DMAReq_Tx, ENABLE);  /* 外设复位会清掉 DMA 请求使能 */
+
+    I2S_Cmd(SPI2, DISABLE);               /* 明确关着，等 DMA 先填第一个半字 */
 }
 
 

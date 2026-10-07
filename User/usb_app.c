@@ -598,20 +598,22 @@ void usbd_audio_set_sampling_freq(uint8_t busid, uint8_t ep, uint32_t sampling_f
      * 主机每次开流都会发这个请求（哪怕采样率没变）。
      * I2S_SetFs() 内部已经做了"分频没变就直接返回"的保护：
      *   返回值 0 = 分频没改 → 这里等于什么都没做，**帧相位保持不动**（关键）✓
-     *   返回值 1 = 分频真的改了 → I2S 被关/开过，帧相位已经是随机值，
-     *              必须把 DMA 一起对齐重启：清缓冲 + 从 index 0 重新起 DMA
-     *              （保证帧相位从缓冲第 0 个半字开始），写指针归 0。
+     *   返回值 1 = 分频真的改了 → 只改 I2SPR 不够！SPI 里残留的 TX 缓冲/移位状态
+     *              会让新流错开一个半字（听起来就是"切换采样率后波形又乱"）。
+     *              所以这里做**彻底重建**：I2S2_Reinit() 走外设复位，
+     *              然后 DMA 与 I2S 一起、从缓冲第 0 个半字对齐启动。
      */
     if (I2S_SetFs(sampling_freq) != 0u) {
         NVIC_DisableIRQ(TIM2_IRQn);
         I2S2_DMA_Stop();
+        I2S2_Reinit(sampling_freq);       /* 外设复位 + 设成新分频，之后 I2S 是关的 */
         memset(i2s_tx_buf, 0, sizeof(i2s_tx_buf));
         i2s_write_idx = 0;
         i2s_read_idx = 0;
         s_level = 0;
         s_integral = 0.0f;
         s_err_last = 0.0f;
-        I2S2_DMA_Start(i2s_tx_buf, I2S_BUF_SIZE);   /* DMA 与 I2S 一起、对齐启动 */
+        I2S2_DMA_Start(i2s_tx_buf, I2S_BUF_SIZE);   /* 对齐启动（等第一个半字进 TX 缓冲） */
         NVIC_EnableIRQ(TIM2_IRQn);
     }
 
