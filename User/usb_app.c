@@ -420,21 +420,35 @@ void Audio_Init(void)
 }
 
 /*
- * 把写指针对到"读指针 + 安全区"之后（向上取整到 4 半字 = 1 帧），
- * 并把这段安全区清成 0 —— 这样新数据到来之前 DAC 播的是静音，不会播到旧数据。
- * 打开音频流时调用；欠载恢复时也调用（不动 DMA，只把写指针挪到安全位置）。
+ * 把写指针对到"读指针 + **目标水位**"之后（向上取整到 4 半字 = 1 帧），
+ * 并把这段距离清成 0 —— 新数据到来之前 DAC 播的是静音，不会播到旧数据。
+ *
+ * 为什么对到"目标水位"而不是"安全区"：
+ *   对到安全区（目标的一半）会让水位从半满开始，还得靠 PID 慢慢补上去，
+ *   这段"补水位"的时间里余量只有一半，一旦主机送数稍慢就是一次欠载 ——
+ *   也就是"切换设备后过几秒必然断一下"的那种。直接对到目标水位，
+ *   切换/恢复之后立刻就在设定点上，余量也是满的，延迟不变（还是 4ms）。
+ *
+ * 打开音频流、欠载恢复、流停了又恢复时都会调用（不动 DMA，只挪写指针）。
  * 期间关 USB 中断：ISO 回调也在改这些量。
  */
 static void Audio_AlignWrite(void)
 {
-    int32_t rp, end, k;
+    int32_t rp, end, k, dist;
 
     NVIC_DisableIRQ(USBHS_IRQn);
 
-    rp  = Audio_ReadPos();
-    end = rp + s_safe_margin;
+    /* 目标水位（保底不低于安全区），一帧对齐 */
+    dist = s_target_level;
+    if (dist < s_safe_margin) {
+        dist = s_safe_margin;
+    }
+    dist = (dist + 3) & ~3;
 
-    /* 安全区填 0：4 半字一步（缓冲长度是 4 的倍数，所以 i..i+3 不会跨出数组） */
+    rp  = Audio_ReadPos();
+    end = rp + dist;
+
+    /* 这段距离填 0：4 半字一步（缓冲长度是 4 的倍数，所以 i..i+3 不会跨出数组） */
     for (k = (rp + 3) & ~3; k < end; k += 4) {
         int32_t i = k % (int32_t)I2S_BUF_SIZE;
         i2s_tx_buf[i]     = 0;
@@ -445,7 +459,7 @@ static void Audio_AlignWrite(void)
 
     i2s_write_idx = (int16_t)(((end + 3) & ~3) % (int32_t)I2S_BUF_SIZE);  /* 新数据从这里开始写 */
     i2s_read_idx  = (int16_t)(rp % (int32_t)I2S_BUF_SIZE);
-    s_level    = s_safe_margin;
+    s_level    = dist;
     s_integral = 0.0f;
     s_err_last = 0.0f;
 
