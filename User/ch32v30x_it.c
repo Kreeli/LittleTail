@@ -10,6 +10,7 @@
 * microcontroller manufactured by Nanjing Qinheng Microelectronics.
 *******************************************************************************/
 #include "ch32v30x_it.h"
+#include "usb_app.h"   /* Audio_SyncTick() */
 
 void NMI_Handler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
 void HardFault_Handler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
@@ -66,5 +67,20 @@ void DMA1_Channel5_IRQHandler(void){
   else if(DMA_GetITStatus(DMA1_IT_TC5) == SET){
     DMA_ClearITPendingBit(DMA1_IT_TC5);
   }
+}
+
+/*
+ * TIM2 更新中断：音频同步环的节拍（1kHz，见 Syscfg.c 的 AUDIO_SYNC_TIM_Init）。
+ * 反馈值/水位 PI 在这里更新，不依赖主循环的 Delay_Ms。
+ * 里面只做整数和 float(硬件 FPU) 运算，不打印、不阻塞。
+ */
+void TIM2_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
+void TIM2_IRQHandler(void)
+{
+  if(TIM_GetITStatus(TIM2, TIM_IT_Update) == SET)
+  {
+    Audio_SyncTick();
+  }
+  TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
 }
 

@@ -4,9 +4,8 @@ void Syscfg(void){
 	I2C2_init();
 	ES9018_RST_Init();
 	HP_AMP_RST_Init();
-    I2S2_ClockInit();
-	I2S2_Init();
     TIM1_Init();
+    AUDIO_SYNC_TIM_Init();
 }
 
 void LED_Init(){
@@ -187,14 +186,33 @@ void I2S2_ClockInit(void)
  */
 #define I2S2_SRC_HZ  160000000u
 
-void I2S_SetFs(uint32_t freq)
+/* 当前分频比 N = 2*I2SDIV + ODD（I2SPR: [7:0]=I2SDIV, [8]=ODD） */
+uint16_t I2S_GetDivN(void)
+{
+    uint16_t pr = (uint16_t)SPI2->I2SPR;
+
+    return (uint16_t)(((pr & 0xFFu) << 1) | ((pr >> 8) & 1u));
+}
+
+/* 真实的 LRCK 频率：fS = fI2S / (64 * N) */
+uint32_t I2S_GetRealFs(void)
+{
+    uint16_t n = I2S_GetDivN();
+
+    if (n == 0u) {
+        return 0u;
+    }
+    return (uint32_t)(I2S2_SRC_HZ / (64u * (uint32_t)n));
+}
+
+uint8_t I2S_SetFs(uint32_t freq)
 {
     uint32_t n;
     uint16_t i2sodd, i2sdiv, pr;
     uint16_t cfgr;
 
     if (freq == 0u) {
-        return;
+        return 0u;
     }
 
     /* N = round(fI2S / (64 * Fs)) */
@@ -211,25 +229,40 @@ void I2S_SetFs(uint32_t freq)
 
     pr = (uint16_t)(i2sdiv | (uint16_t)(i2sodd << 8) | I2S_MCLKOutput_Disable);
 
-    /* 改分频前先关 I2S，写完再恢复 */
+    /*
+     * **分频没变就什么都别做**！！
+     *
+     * 主机每次打开音频流都会发 SET_CUR(SAMPLING_FREQ)（哪怕采样率根本没变），
+     * 而下面那段"关 I2S → 写分频 → 恢复 I2SE"会让 I2S **关一下又开**：
+     * 帧相位（哪个半字是 L、哪个是 R）就从当前位置随便重新开始了，而 DMA 的
+     * 半字流一点没动 —— 两者永久错开，表现为：
+     *   时好时坏 / 左右声道互换 / 没声 / 满幅噪声，而且和 CPOL 无关。
+     * 所以先比较分频：一样就直接返回，绝不碰 I2SE。
+     *
+     * 返回值：0 = 分频没变（I2S 没被打断）；1 = 真的改了（帧相位已断，调用方要重建流）
+     */
+    if ((SPI2->I2SPR & 0x01FFu) == (pr & 0x01FFu)) {
+        return 0u;                    /* 高频路径：采样率没变，保持帧相位不动 */
+    }
+
+    /* 真的要改分频：只能关掉再写（手册要求 I2SDIV/ODD 只能在 I2SE=0 时写），
+     * 写完恢复 I2SE。调用方（usbd_audio_set_sampling_freq）必须随后把整条流
+     * 对齐重启，否则帧相位就是随机值。 */
     cfgr = SPI2->I2SCFGR;
     SPI2->I2SCFGR = (uint16_t)(cfgr & (uint16_t)~0x0400); /* I2SE = 0 */
     SPI2->I2SPR = pr;
     SPI2->I2SCFGR = cfgr;
+
+    return 1u;
 }
-static const uint16_t *s_i2s_buf;
-static uint16_t s_i2s_len;
 
 /*
  * DMA1_CH5 = SPI2_TX，内存 → SPI2.DATAR（发送）
  * 32bit 样点拆成 [hi][lo] 半字流，halfword_count = 样点数 × 2。
- */
-void I2S2_DMA_Init(const uint16_t *buf, uint16_t halfword_count)
+ */void I2S2_DMA_Init(const uint16_t *buf, uint16_t halfword_count)
 {
     DMA_InitTypeDef DMA_InitStructure = {0};
 
-    s_i2s_buf = buf;
-    s_i2s_len = halfword_count;
 
     RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
 
@@ -250,14 +283,14 @@ void I2S2_DMA_Init(const uint16_t *buf, uint16_t halfword_count)
     SPI_I2S_DMACmd(SPI2, SPI_I2S_DMAReq_Tx, ENABLE);
 }
 
-void I2S2_DMA_Start(void)
+void I2S2_DMA_Start(const uint16_t *buf, uint16_t halfword_count)
 {
     SPI_I2S_ClearFlag(SPI2, I2S_FLAG_UDR);
     SPI_I2S_ClearFlag(SPI2, SPI_I2S_FLAG_OVR);
 
     DMA_Cmd(DMA1_Channel5, DISABLE);
-    DMA_SetCurrDataCounter(DMA1_Channel5, s_i2s_len);
-    DMA1_Channel5->MADDR = (uint32_t)s_i2s_buf;
+    DMA_SetCurrDataCounter(DMA1_Channel5, halfword_count);
+    DMA1_Channel5->MADDR = (uint32_t)buf;
     DMA_Cmd(DMA1_Channel5, ENABLE);
 
     I2S_Cmd(SPI2, ENABLE);
@@ -273,5 +306,48 @@ void I2S2_DMA_Stop(void)
 {
     I2S_Cmd(SPI2, DISABLE);
     DMA_Cmd(DMA1_Channel5, DISABLE);
+}
+
+/* ---------------------------------------------------------------------------
+ * 音频同步环的节拍定时器：TIM2 更新中断 @1kHz
+ *
+ * 为什么不用主循环延时：主循环会被 printf/CDC 输出拖慢到几十毫秒，节拍完全不准；
+ * 反馈值（UAC2 异步播放的水位 PI）必须按固定周期更新。
+ * 参考 TIM1 的配置方式（见上面的 TIM1_Init）。
+ *
+ * 时钟：TIM1 在 APB2 上跑 144MHz（你的 TIM1_Init 用 14400 分频得到 10kHz，
+ * 正好说明它的定时器时钟是 144MHz）。TIM2 在 APB1 上，按你说的分频后是 72MHz。
+ * 如果实际不是 72MHz，改 SYNC_TIMER_CLK_HZ 即可；
+ * 校验方法：看串口打印行最后一列（本 tick 收到几个音频包），
+ * bInterval=1、1kHz tick 时应该稳定显示 8；显示 4 就说明时钟是这里写的两倍。
+ * ------------------------------------------------------------------------- */
+#define SYNC_TIMER_CLK_HZ   72000000u
+
+void AUDIO_SYNC_TIM_Init(void)
+{
+    NVIC_InitTypeDef NVIC_InitStructure = {0};
+    TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure = {0};
+
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
+
+    /* 先分频到 1MHz，再数 1000 个 -> 1kHz 更新中断 */
+    TIM_TimeBaseInitStructure.TIM_Period = 1000 - 1;
+    TIM_TimeBaseInitStructure.TIM_Prescaler = (SYNC_TIMER_CLK_HZ / 1000000u) - 1;
+    TIM_TimeBaseInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
+    TIM_TimeBaseInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
+    TIM_TimeBaseInitStructure.TIM_RepetitionCounter = 0;
+    TIM_TimeBaseInit(TIM2, &TIM_TimeBaseInitStructure);
+
+    TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
+
+    /* 抢占优先级要低于 USBHS(0)，别把 USB 中断挤掉 */
+    NVIC_InitStructure.NVIC_IRQChannel = TIM2_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+
+    TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
+    TIM_Cmd(TIM2, ENABLE);
 }
 

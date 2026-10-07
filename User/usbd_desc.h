@@ -50,7 +50,7 @@ uint8_t conf_desc[] = {
         EP_CDC_OUT,
         EP_CDC_IN,
         CDC_MAXSIZE,
-        0x00
+        0x01
     ),
     //IAD + 控制interface的描述符 + Header
     /*

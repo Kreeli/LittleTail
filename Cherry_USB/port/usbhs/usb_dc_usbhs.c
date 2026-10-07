@@ -16,7 +16,7 @@
  *      同步 OUT 事务主机永远发 DATA0，一旦让硬件自动翻转，硬件第二次就期待
  *      DATA1，TOG_OK=0 → 包被 ACK 掉却不上交 → 回调"只进一次"。
  *   c) 响应位：同步端点不做握手，响应码只表示"这一包收不收/发不发"。
- *      TinyUSB 用 NYET 表示"已挂好"，沁恒的量产固件用 ACK。见 CH32_USBHS_ISO_RES。
+ *      收发两个方向分开配置，见 CH32_USBHS_ISO_RX_RES / CH32_USBHS_ISO_TX_RES。
  *   d) 同步 OUT 不按 TOG_OK 过滤（c 的补充保险）；同步 IN 只改响应位、不碰翻转位。
  *   e) UEPn_MAX_LEN **每个端点索引只有一份寄存器**，IN/OUT 共用：同一个索引的
  *      两个方向要不同包长时，后打开的一方会覆盖前者，必须换索引。
@@ -50,16 +50,22 @@
 #define CH32_USBHS_EP0_DMA_SIZE CONFIG_USBDEV_REQUEST_BUFFER_LEN
 
 /*
- * 同步端点的"允许收发"响应码。
- * 低两位：00=ACK 01=NYET 10=NAK 11=STALL。
- * TinyUSB 的 CH32 USBHS 端口用 NYET（并注明"ISO 传输不受 INT_BUSY 约束"），
- * 沁恒 ch32v30x_usbhs_device.c 用 ACK 且只在初始化时写一次 —— 两种都能跑，
- * 说明这一位对同步端点并不严格区分 ACK/NYET。
- * 这里跟随 TinyUSB（最新、有人在维护）。如果上板发现同步 OUT 一包都收不到，
- * 把下面改成 USBHS_UEP_R_RES_ACK 再试一次即可（只影响同步端点）。
+ * 同步端点的"允许收发"响应码（低两位：00=ACK 01=NYET 10=NAK 11=STALL）。
+ * 同步端点不做握手，这一位只表示"这一包收不收 / 发不发"。
+ * 收发两个方向分开配置，因为实测它们表现不一样：
+ *
+ *   接收 Rx（音频数据 OUT）：NYET。本工程 96k 播放已经验证过能正常收，别动。
+ *   发送 Tx（反馈 IN）      ：ACK。反馈是唯一的同步 IN；NYET 在同步 IN 上语义可疑
+ *                            （同步事务本来不该有握手），一旦主机在这条 IN 上收到
+ *                            异常握手，可能牵连整个设备 —— 现象正是
+ *                            "音频在播时控制传输不响应/COM 口打不开"。
+ *                            沁恒量产 UAC2 固件的反馈端点用的就是 ACK。
  */
-#ifndef CH32_USBHS_ISO_RES
-#define CH32_USBHS_ISO_RES USBHS_UEP_R_RES_NYET
+#ifndef CH32_USBHS_ISO_RX_RES
+#define CH32_USBHS_ISO_RX_RES USBHS_UEP_R_RES_NYET
+#endif
+#ifndef CH32_USBHS_ISO_TX_RES
+#define CH32_USBHS_ISO_TX_RES USBHS_UEP_T_RES_ACK
 #endif
 
 /*
@@ -75,10 +81,6 @@
  * 只使能没清（或只清没使能），前者表现为 USB 中断风暴、COM 口打不开，后者表现为
  * 回调只进一次。
  */
-#ifndef CH32_USBHS_ISO_ACT_INT
-#define CH32_USBHS_ISO_ACT_INT 0
-#endif
-
 struct ch32_usbhs_ep_state {
     uint16_t ep_mps;
     uint32_t xfer_len;
@@ -128,7 +130,7 @@ static inline uint8_t ch32_usbhs_iso_out(uint8_t ep)
 static void ch32_usbhs_ep_in_arm(uint8_t ep)
 {
     if (ep && ch32_usbhs_iso_in(ep)) {
-        ENDP_TX_CTRL(ep) = USBHS_UEP_T_TOG_DATA0 | CH32_USBHS_ISO_RES;
+        ENDP_TX_CTRL(ep) = USBHS_UEP_T_TOG_DATA0 | CH32_USBHS_ISO_TX_RES;
     } else {
         ENDP_TX_CTRL(ep) = (ENDP_TX_CTRL(ep) & ~USBHS_UEP_T_RES_MASK) | USBHS_UEP_T_RES_ACK;
     }
@@ -148,7 +150,7 @@ static void ch32_usbhs_ep_in_idle(uint8_t ep)
 static void ch32_usbhs_ep_out_arm(uint8_t ep)
 {
     if (ep && ch32_usbhs_iso_out(ep)) {
-        ENDP_RX_CTRL(ep) = USBHS_UEP_R_TOG_DATA0 | CH32_USBHS_ISO_RES;
+        ENDP_RX_CTRL(ep) = USBHS_UEP_R_TOG_DATA0 | CH32_USBHS_ISO_RX_RES;
     } else {
         ENDP_RX_CTRL(ep) = (ENDP_RX_CTRL(ep) & ~USBHS_UEP_R_RES_MASK) | USBHS_UEP_R_RES_ACK;
     }
@@ -226,13 +228,10 @@ int usb_dc_init(uint8_t busid)
     ch32_usbhs_hw_reset(busid);
 
     /* 把上一次残留的标志清干净，再开中断源。
-     * UIE_ISO_ACT 默认不使能（见文件头 CH32_USBHS_ISO_ACT_INT 的说明）。 */
+     * ISO_ACT 不使能（它的中断打开会风暴）；同步端点的完成一样走 UIF_TRANSFER。 */
     USBHSD->INT_FG = 0xFF;
     USBHSD->INT_EN = USBHS_UIE_SETUP_ACT | USBHS_UIE_TRANSFER |
                      USBHS_UIE_DETECT | USBHS_UIE_SUSPEND;
-#if CH32_USBHS_ISO_ACT_INT
-    USBHSD->INT_EN |= USBHS_UIE_ISO_ACT;
-#endif
 
     /* 设备上拉 —— 主机就是在这一步看到 D+ 的 */
     USBHSD->CONTROL |= USBHS_UC_DEV_PU_EN;
@@ -418,6 +417,19 @@ int usbd_ep_start_write(uint8_t busid, const uint8_t ep, const uint8_t *data, ui
     if (data && ((uint32_t)data & 0x03)) {
         return -3;
     }
+    /*
+     * 端点必须先被 usbd_ep_open() 打开（ENDP_CONFIG 里使能），才能往上挂数据。
+     * 否则数据会挂在一个永远不会产生完成事件的端点上：
+     *   - 应用层如果"发不出去就算了"，看起来只是没输出；
+     *   - 应用层如果用 while(tx_busy) 等完成（本工程 CDC_WriteBlocking 就是），
+     *     tx_busy 会永远停在 1 —— **把主循环彻底挂死**：设备能枚举、串口能打开、
+     *     中断还在跑（音频照响），但一个字节都发不出来，别的初始化也不会执行。
+     * 例：main 里那句 printf 出现在 SET_CONFIGURATION 之前时就是这个下场。
+     * 所以这里明确返回错误，让调用方"以后再来"，而不是把请求挂死。
+     */
+    if (!(USBHSD->ENDP_CONFIG & ENDP_T_EN_BIT(ep_idx))) {
+        return -4;
+    }
     /* 非同步端点必须处于 NAK 才能重新挂载（否则上一包还没发完）。
      * 同步端点允许随时刷新：反馈端点本身就是"每次完成就换一包新的"，
      * 它不做握手，刷新不会影响已经上线的那一包。 */
@@ -441,6 +453,8 @@ int usbd_ep_start_write(uint8_t busid, const uint8_t ep, const uint8_t *data, ui
 
     ENDP_TX_LEN(ep_idx) = tx_len;
     ch32_usbhs_ep_in_arm(ep_idx);
+    if (ep_idx == 0) {
+    }
     return 0;
 }
 
@@ -460,6 +474,12 @@ int usbd_ep_start_read(uint8_t busid, const uint8_t ep, uint8_t *data, uint32_t 
     udc->ep_out[ep_idx].xfer_len = data_len;
     udc->ep_out[ep_idx].actual_xfer_len = 0;
 
+    /* 同 usbd_ep_start_write()：端点没被 usbd_ep_open() 打开就别往上挂，
+     * 否则数据挂在一个不产生完成事件的端点上，上层会一直等不到回调。 */
+    if (!(USBHSD->ENDP_CONFIG & ENDP_R_EN_BIT(ep_idx))) {
+        return -1;
+    }
+
     if (ep_idx == 0) {
         /* EP0 的数据落在 ep0_dma 里，收到之后由 handle_ep0_out 搬回去 */
         udc->ep0_out_ptr = data;
@@ -474,6 +494,8 @@ int usbd_ep_start_read(uint8_t busid, const uint8_t ep, uint8_t *data, uint32_t 
     }
 
     ch32_usbhs_ep_out_arm(ep_idx);
+    if (ep_idx == 0) {
+    }
     return 0;
 }
 
@@ -485,6 +507,7 @@ int usbd_ep_start_read(uint8_t busid, const uint8_t ep, uint8_t *data, uint32_t 
 static void handle_ep0_in(uint8_t busid)
 {
     struct ch32_usbhs_udc *udc = &g_ch32_usbhs_udc[busid];
+
 
     if (udc->setup.bmRequestType & 0x80) {
         /* 数据阶段：翻转 DATA0/DATA1，然后先 NAK，交给 core 决定发不发下一包 */
@@ -512,6 +535,7 @@ static void handle_ep0_out(uint8_t busid)
     struct ch32_usbhs_udc *udc = &g_ch32_usbhs_udc[busid];
     uint32_t read_count = USBHSD->RX_LEN;
 
+
     if (read_count > udc->ep_out[0].xfer_len) {
         read_count = udc->ep_out[0].xfer_len;
     }
@@ -534,6 +558,10 @@ static void handle_ep0_out(uint8_t busid)
 static void handle_non_ep0_in(uint8_t busid, uint8_t epid)
 {
     struct ch32_usbhs_udc *udc = &g_ch32_usbhs_udc[busid];
+
+    if (ch32_usbhs_iso_in(epid)) {
+    } else {
+    }
 
     ch32_usbhs_ep_in_idle(epid);
 
@@ -558,6 +586,10 @@ static void handle_non_ep0_out(uint8_t busid, uint8_t epid, uint32_t rx_len)
     struct ch32_usbhs_udc *udc = &g_ch32_usbhs_udc[busid];
     uint32_t read_count = MIN(rx_len, udc->ep_out[epid].xfer_len);
     uint8_t is_iso = ch32_usbhs_iso_out(epid);
+
+    if (is_iso) {
+    } else {
+    }
 
     /* 非同步端点先 NAK，避免回调里重新挂载之前又来一包踩同一个缓冲。
      * 同步端点不能 NAK：丢一包就是永久丢失，而且它的 DMA 目标由上层立刻换新。 */
@@ -588,76 +620,19 @@ void USBD_IRQHandler(uint8_t busid)
     uint8_t intflag = USBHSD->INT_FG;
     uint8_t intst = USBHSD->INT_ST;
 
-#if CH32_USBHS_ISO_ACT_INT
-    if (intflag & USBHS_UIF_TRANSFER_MASK) {
-#else
-    if (intflag & USBHS_UIF_TRANSFER) {
-#endif
-        uint8_t token = intst & USBHS_UIS_TOKEN_MASK;
-        uint8_t endp = intst & USBHS_UIS_ENDP_MASK;
-        uint32_t rx_len = 0;
 
-#if CH32_USBHS_ISO_ACT_INT
-        /*
-         * ISO_ACT 单独置位（TRANSFER 没置位）时，只有同步端点的完成才可能走这条路。
-         * 如果它指向的不是同步端点，说明这一位是"状态位"而不是完成事件：
-         * 把 token 改成一个不会命中任何分支的值，等于什么都不做。
-         * （UIS_TOKEN_SETUP=0b11 不会命中 IN/OUT/SOF 三个分支）
-         */
-        if ((intflag & USBHS_UIF_ISO_ACT) && !(intflag & USBHS_UIF_TRANSFER) &&
-            !ch32_usbhs_iso_in(endp) && !ch32_usbhs_iso_out(endp)) {
-            token = USBHS_UIS_TOKEN_SETUP;
-        }
-#endif
-
-        if (token == USBHS_UIS_TOKEN_OUT) {
-            rx_len = USBHSD->RX_LEN; /* 必须在清标志之前锁存 */
-        }
-
-        /*
-         * 非 EP0 的完成标志先清掉再跑用户回调：
-         * 同步传输不受 UC_INT_BUSY 约束，如果我们在这里慢慢处理，下一包的完成
-         * 会盖掉这一次的 INT_ST / RX_LEN。所以本包要用的信息已经先锁存到局部变量。
-         * EP0 例外 —— EP0 受 INT_BUSY 保护，提前放行反而会让新的阶段插进来。
-         */
-        if (endp != 0) {
-            USBHSD->INT_FG = intflag & USBHS_UIF_TRANSFER_MASK;
-        }
-
-        if (token == USBHS_UIS_TOKEN_IN) {
-            if (endp == 0) {
-                handle_ep0_in(busid);
-                if (udc->dev_addr_pending) {
-                    USBHSD->DEV_AD = udc->dev_addr;
-                    udc->dev_addr_pending = 0;
-                }
-            } else {
-                handle_non_ep0_in(busid, endp);
-            }
-        } else if (token == USBHS_UIS_TOKEN_OUT) {
-            if (endp == 0) {
-                handle_ep0_out(busid);
-            } else if (ch32_usbhs_iso_out(endp) || (intst & USBHS_UIS_TOG_OK)) {
-                /*
-                 * 同步端点不看 TOG_OK：同步 OUT 的 PID 由主机固定为 DATA0，
-                 * 这一位在同步端点上一旦为 0，包会被 ACK 掉却不上交，
-                 * 而且这个分支不会重新挂 DMA —— 之后就每一包都从这里漏掉，
-                 * 表现就是"回调只进一次"。非同步端点照旧要看。
-                 */
-                handle_non_ep0_out(busid, endp, rx_len);
-            } else {
-                /* 非同步端点翻转不匹配：重新 ACK，等主机重传 */
-                ch32_usbhs_ep_out_arm(endp);
-            }
-        } else if (token == USBHS_UIS_TOKEN_SOF) {
-            /* 设备模式下 SOF 以 token 形式出现在 TRANSFER 中断里（UIF_HST_SOF 是主机模式的）。
-             * 高速下每 125us 一次。异步播放的反馈端点可以靠它刷新。 */
-            usbd_event_sof_handler(busid);
-        }
-
-        if (endp == 0) {
-            USBHSD->INT_FG = intflag & USBHS_UIF_TRANSFER_MASK;
-        }
+    /*
+     * 分支顺序：**总线复位 > SETUP > 传输完成 > 挂起**。
+     * SETUP 必须排在"传输完成"前面：控制传输的数据/状态阶段要靠 SETUP 之后立刻
+     * 把 EP0 摆好，而音频在播时同步完成是每 125us 一笔（每秒 8000 笔）。
+     * 如果先处理它们，SETUP 会被一直往后排，主机那边的控制传输就超时了 ——
+     * 表现就是"音频在播时 COM 口打不开、点断开还会把上位机卡死"。
+     */
+    if (intflag & USBHS_UIF_DETECT) {
+        /* 总线复位 */
+        USBHSD->INT_FG = USBHS_UIF_DETECT;
+        ch32_usbhs_hw_reset(busid);
+        usbd_event_reset_handler(busid);
     } else if (intflag & USBHS_UIF_SETUP_ACT) {
         USBHSD->UEP0_DMA = (uint32_t)udc->ep0_dma;
         memcpy(&udc->setup, udc->ep0_dma, sizeof(udc->setup));
@@ -672,11 +647,83 @@ void USBD_IRQHandler(uint8_t busid)
         usbd_event_ep0_setup_complete_handler(busid, (uint8_t *)&udc->setup);
 
         USBHSD->INT_FG = USBHS_UIF_SETUP_ACT;
-    } else if (intflag & USBHS_UIF_DETECT) {
-        /* 总线复位 */
-        USBHSD->INT_FG = USBHS_UIF_DETECT;
-        ch32_usbhs_hw_reset(busid);
-        usbd_event_reset_handler(busid);
+    } else if ((intflag & USBHS_UIF_TRANSFER)) {
+        uint8_t rounds = 0;
+
+        /*
+         * 循环处理，而不是"一次中断只处理一个完成事件"。
+         *
+         * 这块硬件只有**一份** INT_ST / RX_LEN，一次中断只能告诉你"最近完成的那一笔"；
+         * 而同步(ISO)传输**不受 UC_INT_BUSY 约束**，所以在处理一笔的期间，硬件完全
+         * 可能又完成了一笔（并把 INT_ST 覆盖掉）。如果留给下一次中断再处理，
+         * 被覆盖的那笔就永久丢了 —— EP0 的控制阶段丢一次，整个控制传输就卡到主机
+         * 超时（COM 口打不开 / 点断开把上位机卡死），而批量端点只是重传，看不出来。
+         *
+         * 所以每处理完一笔就立刻回头再看一眼 INT_FG，把攒下的一并处理掉。
+         * rounds 只是兜底，防止标志异常时在这里死循环。
+         */
+        do {
+            uint8_t token = intst & USBHS_UIS_TOKEN_MASK;
+            uint8_t endp = intst & USBHS_UIS_ENDP_MASK;
+            uint32_t rx_len = 0;
+
+            if (token == USBHS_UIS_TOKEN_OUT) {
+                rx_len = USBHSD->RX_LEN; /* 必须在清标志之前锁存 */
+            }
+
+            /*
+             * 非 EP0 的完成标志先清掉再跑用户回调：
+             * 同步传输不受 UC_INT_BUSY 约束，如果我们在这里慢慢处理，下一包的完成
+             * 会盖掉这一次的 INT_ST / RX_LEN。所以本包要用的信息已经先锁存到局部变量。
+             * EP0 例外 —— EP0 受 INT_BUSY 保护，提前放行反而会让新的阶段插进来。
+             */
+            if (endp != 0) {
+                USBHSD->INT_FG = intflag & USBHS_UIF_TRANSFER_MASK;
+            }
+
+            if (token == USBHS_UIS_TOKEN_IN) {
+                if (endp == 0) {
+                    handle_ep0_in(busid);
+                    if (udc->dev_addr_pending) {
+                        USBHSD->DEV_AD = udc->dev_addr;
+                        udc->dev_addr_pending = 0;
+                    }
+                } else {
+                    handle_non_ep0_in(busid, endp);
+                }
+            } else if (token == USBHS_UIS_TOKEN_OUT) {
+                if (endp == 0) {
+                    handle_ep0_out(busid);
+                } else if (ch32_usbhs_iso_out(endp) || (intst & USBHS_UIS_TOG_OK)) {
+                    /*
+                     * 同步端点不看 TOG_OK：同步 OUT 的 PID 由主机固定为 DATA0，
+                     * 这一位在同步端点上一旦为 0，包会被 ACK 掉却不上交，
+                     * 而且这个分支不会重新挂 DMA —— 之后就每一包都从这里漏掉，
+                     * 表现就是"回调只进一次"。非同步端点照旧要看。
+                     */
+                    handle_non_ep0_out(busid, endp, rx_len);
+                } else {
+                    /* 非同步端点翻转不匹配：重新 ACK，等主机重传 */
+                    ch32_usbhs_ep_out_arm(endp);
+                }
+            } else if (token == USBHS_UIS_TOKEN_SOF) {
+                /* 设备模式下 SOF 以 token 形式出现在 TRANSFER 中断里（UIF_HST_SOF 是主机模式的）。
+                 * 高速下每 125us 一次。异步播放的反馈端点可以靠它刷新。 */
+                usbd_event_sof_handler(busid);
+            }
+
+            if (endp == 0) {
+                USBHSD->INT_FG = intflag & USBHS_UIF_TRANSFER_MASK;
+                break; /* EP0 一次中断只处理一个阶段 */
+            }
+
+            /* 回头看一眼：刚才处理期间有没有新的完成攒下来 */
+            intflag = USBHSD->INT_FG;
+            intst = USBHSD->INT_ST;
+        } while ((intflag & USBHS_UIF_TRANSFER) && (++rounds < 8));
+
+        if (rounds) {
+        }
     } else if (intflag & USBHS_UIF_SUSPEND) {
         USBHSD->INT_FG = USBHS_UIF_SUSPEND;
         if (USBHSD->MIS_ST & USBHS_UMS_SUSPEND) {
@@ -687,6 +734,10 @@ void USBD_IRQHandler(uint8_t busid)
     } else {
         /* 兜底：把没人认领的标志清掉，绝不让 INT_FG 挂着不该挂的位造成中断风暴 */
         USBHSD->INT_FG = intflag;
+    }
+
+    /* 退出中断时 SETUP_ACT 还挂着 → 说明这个控制请求还没处理，主机那边要超时了 */
+    if (USBHSD->INT_FG & USBHS_UIF_SETUP_ACT) {
     }
 
     /*

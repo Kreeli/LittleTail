@@ -118,6 +118,8 @@ uint8_t  ES9018_ReadReg(uint8_t reg);
 void     ES9018_Init(void);
 void     ES9018_SoftwareReset(void);
 void ES9018_HardwareReset(void);
+/* 快速复位：只拉 RST 一下，不重写寄存器；Delay_Us 可被中断打断，不丢同步包 */
+void ES9018_FastReset(void);
 
 void     ES9018_SetVolume(uint8_t vol);       /* 左右声道设为相同值 */
 void     ES9018_SetVolumeL(uint8_t vol);      /* 左声道 0=-0dB, 255=-127.5dB */

@@ -10,9 +10,29 @@ void TIM1_Init();
 
 void I2S2_ClockInit();
 void I2S2_Init(void);
-void I2S_SetFs(uint32_t freq);
+/* 设置 I2S 采样率。返回 1 = 分频真的改了（I2S 帧相位被打断，调用方必须重建流）；
+ * 返回 0 = 分频没变，什么都没做（主机重复发 SET_CUR 时靠这个保住帧相位）。
+ * 别把它改回 void —— 见 Syscfg.c 里的详细说明。 */
+uint8_t I2S_SetFs(uint32_t freq);
 void I2S2_DMA_Init(const uint16_t *buf, uint16_t halfword_count);
-void I2S2_DMA_Start(void);
+void I2S2_DMA_Start(const uint16_t *buf, uint16_t halfword_count);
 void I2S2_DMA_Stop(void);
 void I2S2_DMA_Recover(void);
 uint8_t I2S2_Underrun(void);
+
+/* 音频同步环的节拍定时器（TIM2 @1kHz），在 Syscfg() 里初始化；
+ * 更新中断里调用 Audio_SyncTick()（见 ch32v30x_it.c） */
+void AUDIO_SYNC_TIM_Init(void);
+
+/* I2S 分频的真实值：N = 2*I2SDIV + ODD，fS_real = 160MHz / (64*N)
+ *   48k -> N=52 -> 48076.92Hz      96k -> N=26 -> 96153.85Hz
+ * 音频同步的"标称反馈值"必须用这个真实速率，不能用整数 48000/96000。 */
+uint16_t I2S_GetDivN(void);
+uint32_t I2S_GetRealFs(void);
+
+/* I2S 播放缓冲（单位：半字 = int16_t 个数 = 4 个半字/样点帧）。
+ * 延时 = I2S_BUF_HALFWORDS / (4 * fS) 秒：
+ *   48k(默认) -> 8ms      96k -> 4ms      24k -> 16ms
+ * 缓冲越大越不容易欠载/溢出，代价是延迟和 3KB RAM。
+ * 主机送数速率和本机采样率之间总有 ppm 级偏差，缓冲太小根本没法用 PID 稳住。 */
+#define I2S_BUF_HALFWORDS   1536u

@@ -77,6 +77,24 @@ void ES9018_HardwareReset(void)
     Delay_Ms(1);
 }
 
+/*
+ * 快速复位：只拉一下 RST 再放开，**不重写任何寄存器**
+ * （芯片复位后按硬件默认/strap 就能直接工作）。
+ *
+ * 为什么用 Delay_Us 而不是 Delay_Ms：
+ *   1) 总耗时 ~210us，而不是 2ms；
+ *   2) Delay_Us 是轮询 SysTick 的循环，**可以被中断打断** ——
+ *      USB 中断该来还是来，音频同步包不会被错过。
+ * 调用点：Audio_SyncTick()（TIM2 中断）里，见 usb_app.c 的 s_es9018_rst_req。
+ */
+void ES9018_FastReset(void)
+{
+    GPIO_ResetBits(GPIOB, GPIO_Pin_14);   /* RST 拉低 */
+    Delay_Us(10);                         /* 复位脉冲（最短即可） */
+    GPIO_SetBits(GPIOB, GPIO_Pin_14);     /* 释放 */
+    Delay_Us(200);                        /* 等芯片内部起来 */
+}
+
 void ES9018_Init(void)
 {
 
