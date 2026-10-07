@@ -123,6 +123,11 @@ static float    s_corr_last;           /* 最近一次修正量（帧/微帧）�
 static uint32_t s_tick_mf;             /* 上两个 tick 之间收到多少包（校验定时器频率） */
 static uint32_t s_tick_mf_last;        /* 上次统计时的包数 */
 static volatile uint32_t s_tick_ms;    /* TIM2 tick 计数（1kHz 时约等于毫秒） */
+/* 中断里只置标志，真正的打印交给主循环 —— 中断里 printf 会把 USB 中断卡住 */
+static volatile uint8_t  s_evt_open;
+static volatile uint8_t  s_evt_close;
+static volatile uint8_t  s_evt_fs;
+static volatile uint32_t s_evt_fs_val;
 static volatile uint32_t s_fs_hz = 48000u; /* 主机实际请求的采样率（GET_CUR 用它回答） */
 
 static void Audio_UpdateNominal(void); /* 定义在后面，这里先声明 */
@@ -271,8 +276,6 @@ void USBHS_IRQHandler(void){
 }
 
 void CDC_WriteBlocking(uint8_t* buf,int size){
-    uint32_t guard;
-
     if(size <= 0 || buf == NULL)
         return;
     /* tx_buf 只有 512 字节；newlib 的 stdout 全缓冲时一次 flush 可能是 1024 字节，
@@ -280,15 +283,21 @@ void CDC_WriteBlocking(uint8_t* buf,int size){
     if(size > (int)sizeof(tx_buf))
         size = (int)sizeof(tx_buf);
 
-    /* 等上一包发完，但**不能死等**：串口没打开时主机不会来取 CDC IN 的数据，
-     * tx_busy 会一直是 1，死等就把主循环挂死了（USB 中断还在跑，设备看起来还活着，
-     * 但一个字节都发不出来、别的初始化也不再执行）。超时就丢掉这一包。
-     * 注：音频同步环已经不依赖主循环节拍了（走 TIM2 中断），所以这里等一下没关系。 */
-    guard = 2000000u;
-    while(tx_busy && --guard)
-        continue;
-    if(tx_busy)
-        return;
+    /*
+     * **一字节都不等**：上一包还没发完就直接丢掉这次输出。
+     *
+     * 原来这里是"等 200 万次空转（≈70ms）"，问题很大：
+     *   - 终端没打开 / 主机没及时来取 CDC IN 时，tx_busy 一直是 1，
+     *     每次打印都要空转满超时；
+     *   - 而打印还可能发生在 **USB 中断里**（AS_OPEN/AS_CLOSE/FS_SET），
+     *     那就等于把 USB 中断卡住几十毫秒 —— 音频直接卡顿、CDC 输出也会被写坏
+     *     （打印内容前面出现乱码字节就是这个原因）。
+     * 日志本来就是诊断用的，丢几行无所谓；音频和 USB 才是要紧的。
+     * 打印请一律放到主循环（CDC_cmd_proc）里，不要放中断。
+     */
+    if (tx_busy) {
+        return;                 /* 丢掉这一包：不阻塞任何上下文 */
+    }
 
     memcpy(tx_buf,buf,size);
     tx_busy = 1;
@@ -320,6 +329,24 @@ void CDC_out_callback(uint8_t busid, uint8_t ep, uint32_t nbytes){
 }
 
 void CDC_cmd_proc(void){//这个函数留给while主循环调用
+    /*
+     * 中断里发生的事件在这里打印（中断里只置标志）：
+     * 主机是否在重开音频流、以及它请求的采样率是多少 —— 都只在这一处输出，
+     * 既不会卡住 USB 中断，也不会和 S, 行抢 CDC 端点导致输出乱码。
+     */
+    if (s_evt_fs) {
+        s_evt_fs = 0;
+        printf("FS_SET,%u\n", (unsigned)s_evt_fs_val);
+    }
+    if (s_evt_close) {
+        s_evt_close = 0;
+        printf("AS_CLOSE\n");
+    }
+    if (s_evt_open) {
+        s_evt_open = 0;
+        printf("AS_OPEN,%u\n", (unsigned)s_fs_hz);
+    }
+
 	if(g_cdc_out){
 		g_cdc_out = false;
 
@@ -672,8 +699,10 @@ void usbd_audio_set_sampling_freq(uint8_t busid, uint8_t ep, uint32_t sampling_f
 
     Audio_UpdateFsLed();          /* PC7：96k 灭，其它亮 */
 
-    /* 诊断：把实际请求的采样率打出来（手机到底要的是多少，一看就知道） */
-    printf("FS_SET,%u\n", (unsigned)sampling_freq);
+    /* 诊断：把实际请求的采样率打出来（手机到底要的是多少，一看就知道）。
+     * **只置标志**：这里在 USB 中断里，printf 会等 CDC 发送，把 USB 中断卡住。 */
+    s_evt_fs_val = sampling_freq;
+    s_evt_fs = 1;
     return;
 }
 
@@ -786,6 +815,10 @@ void usbd_audio_open(uint8_t busid, uint8_t intf)
 
         /* 这里**不要**复位 ES9018：I2S 时钟一直在跑，复位会让芯片重新找帧边界，
          * 结果就是左右声道随机互换 / 没声 / 噪声（见 Audio_SyncTick 里的说明）。 */
+
+        /* 诊断：Windows 在 app/网页/挂件开始用音频时会重开这条流，这里就会走到。
+         * **只置标志**：本函数跑在 USB 中断里，printf 会把 USB 中断卡住（音频卡顿）。 */
+        s_evt_open = 1;
     }
 }
 
@@ -805,6 +838,7 @@ void usbd_audio_close(uint8_t busid, uint8_t intf)
         audio_open = false;
         //memset(i2s_tx_buf, 0, sizeof(i2s_tx_buf));
         GPIO_ResetBits(GPIOC,GPIO_Pin_8);   /* PC8 是 LED（不是耳放），保持原来的用法 */
+        s_evt_close = 1;                    /* 诊断：主机主动关流（打印在主循环） */
     }
     
 }
