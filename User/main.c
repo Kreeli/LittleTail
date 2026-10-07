@@ -43,6 +43,9 @@ int main(void)
 	I2S2_Init();
 	Audio_Init();
 
+	/* 采样率指示灯初值：开机默认 48k -> PC7 置位（亮）；切到 96k 会灭 */
+	Audio_UpdateFsLed();
+
 	while (1) {
 		CDC_cmd_proc();       /* 串口指令 + 同步状态打印 */
 		Delay_Ms(1);

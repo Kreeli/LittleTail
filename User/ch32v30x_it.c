@@ -47,15 +47,12 @@ void HardFault_Handler(void)
 void TIM1_UP_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
 void TIM1_UP_IRQHandler(void)
 {
-  static u16 LED_state = 0;
-  if(TIM_GetITStatus(TIM1, TIM_IT_Update) == SET)
-  {
-    if((LED_state = ~LED_state))
-      GPIO_SetBits(GPIOC,GPIO_Pin_7);
-    else
-      GPIO_ResetBits(GPIOC,GPIO_Pin_7);
-   
-  } 
+  /*
+   * PC7 原来是这里翻转的"呼吸灯"，现在改成**采样率指示**（见 usb_app.c 的
+   * Audio_UpdateFsLed()：96k -> 复位/灭，其它 -> 置位/亮）。
+   * 所以这里不再碰 PC7，否则会和状态显示打架。
+   * TIM1 本身保留（其它用途随时可用），只清标志。
+   */
   TIM_ClearITPendingBit(TIM1, TIM_IT_Update);
 }
 

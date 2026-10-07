@@ -552,6 +552,22 @@ bool usbd_audio_get_mute(uint8_t busid, uint8_t ep, uint8_t ch)
     return g_mute;
 }
 
+/* ---------------------------------------------------------------------------
+ * 采样率指示灯：PC7
+ *   当前采样率 == 96k  -> 复位（灭）
+ *   其它（48k/24k/…)  -> 置位（亮）
+ * 开机时是 48k，所以灯默认亮；主机切到 96k 就灭，切回来又亮。
+ * （原来的"TIM1 翻转呼吸灯"已经关掉，见 ch32v30x_it.c 的说明。）
+ * ------------------------------------------------------------------------- */
+void Audio_UpdateFsLed(void)
+{
+    if (s_fs_hz == 96000u) {
+        GPIO_ResetBits(GPIOC, GPIO_Pin_7);
+    } else {
+        GPIO_SetBits(GPIOC, GPIO_Pin_7);
+    }
+}
+
 void usbd_audio_set_sampling_freq(uint8_t busid, uint8_t ep, uint32_t sampling_freq)
 {
     (void)busid;
@@ -602,6 +618,8 @@ void usbd_audio_set_sampling_freq(uint8_t busid, uint8_t ep, uint32_t sampling_f
     Audio_UpdateNominal();
     s_fb_fixed = s_nominal_q16;
     g_update = true;
+
+    Audio_UpdateFsLed();          /* PC7：96k 灭，其它亮 */
 
     /* 诊断：把实际请求的采样率打出来（手机到底要的是多少，一看就知道） */
     printf("FS_SET,%u\n", (unsigned)sampling_freq);

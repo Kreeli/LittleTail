@@ -19,6 +19,8 @@ void USBHS_RCC_init(void);
 void Audio_SyncTick(void);
 /* 开机调用一次：缓冲清 0 并启动 I2S/DMA —— 之后永不停止（DAC 始终有时钟） */
 void Audio_Init(void);
+/* 采样率指示灯 PC7：96k -> 灭（复位），其它 -> 亮（置位） */
+void Audio_UpdateFsLed(void);
 void CDC_WriteBlocking(uint8_t* buf,int size);
 void CDC_Notified_callback(uint8_t busid, uint8_t ep, uint32_t nbytes);
 void CDC_in_callback(uint8_t busid, uint8_t ep, uint32_t nbytes);
