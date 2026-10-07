@@ -22,7 +22,8 @@ void I2S2_DMA_Start(const uint16_t *buf, uint16_t halfword_count);
 void I2S2_Reinit(uint32_t freq);
 void I2S2_DMA_Stop(void);
 void I2S2_DMA_Recover(void);
-uint8_t I2S2_Underrun(void);
+/* I2S2_Underrun() 已删除：从未被调用过。曾用它查"爆米花"是否为 I2S 发送下溢
+ * （UDR），实测从未触发 —— 真凶是 ES9018 的 Reg0x0A stop_div 被写坏，见 ES9018.c。 */
 
 /* 音频同步环的节拍定时器（TIM2 @1kHz），在 Syscfg() 里初始化；
  * 更新中断里调用 Audio_SyncTick()（见 ch32v30x_it.c） */

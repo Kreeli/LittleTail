@@ -114,8 +114,35 @@ void ES9018_Init(void)
     ES9018_WriteReg(ES9018_REG_GENERAL_SETTINGS, 0x80 | ES9018_FILTER_SLOW_ROLLOFF); /* 不 mute */
     ES9018_WriteReg(0x08, 0x10);
 
-    /* Reg0x0A：主机（master_clk_enable=0），stop div = 16384 */
-    ES9018_WriteReg(ES9018_REG_MASTER_MODE_CTRL, 0x00);//bit时钟又不是ES9018驱动的，所以这个无所谓
+    /*
+     * ================= Reg0x0A（Master Mode Control）**不要写** =================
+     *
+     * 这一行原来是 ES9018_WriteReg(ES9018_REG_MASTER_MODE_CTRL, 0x00);
+     * 当时的想法是"Bit 时钟又不是 ES9018 驱动的，这个寄存器无所谓" —— **错了**。
+     *
+     * 手册 Register #10：默认值 = **0x5**，其中
+     *   [7]   master_clock_enable  = 0（不输出 BCLK/LRCK，我们是 MCU 当主机，这部分确实无所谓）
+     *   [6:5] clock_divider_select = 0
+     *   [4]   sync_mode            = 0
+     *   [3:0] stop_div             = 5  ← **关键位**
+     *
+     * stop_div = "DPLL 和 ASRC 锁定前必须经过多少个 FSR 边沿"：
+     *     4'd0  = 16384 个 FSR 边沿
+     *     4'd5  =  2730 个（芯片默认值）
+     *     …
+     *     4'd15 =  1024 个
+     *
+     * 写 0x00 把 stop_div 从 5 改成了 0 —— 锁定时要等的边沿数变成 6 倍。
+     * 于是 DPLL/ASRC 的锁定行为被改坏，听感就是**爆米花一样的劈啪声**
+     * （不同步、反复失锁/重捕）。实测：把这行注释掉、用芯片默认的 0x5，问题消失。
+     *
+     * 结论：**这个寄存器的锁定 FSR 数量很重要，别随便写，用默认值就行。**
+     * 下面保留注释而不是删掉，就是为了留下这个教训：
+     *   // ES9018_WriteReg(ES9018_REG_MASTER_MODE_CTRL, 0x00);
+     *
+     * 注意这跟 master/slave 无关：我们确实不需要它输出时钟，
+     * 但 stop_div 影响的是**内部 DPLL 的锁定速度**，和谁输出 BCLK 是两回事。
+     */
 
     ES9018_WriteReg(0x0B, 0x02);
     ES9018_WriteReg(0x0C, 0x5A);

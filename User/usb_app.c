@@ -145,6 +145,7 @@ static volatile int32_t  s_lost;       /* 累计丢包数（期望 8 包/ms；�
  * 比 DMA 播得快（或水位目标设得过大），可从串口遥测行观察。
  */
 static volatile uint32_t s_overflow;
+
 static volatile uint32_t s_fs_hz = 48000u; /* 主机实际请求的采样率（GET_CUR 用它回答） */
 
 static void Audio_UpdateNominal(void); /* 定义在后面，这里先声明 */

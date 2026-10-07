@@ -348,10 +348,17 @@ void I2S2_Reinit(uint32_t freq)
 }
 
 
-uint8_t I2S2_Underrun(void)
-{
-    return (SPI_I2S_GetFlagStatus(SPI2, I2S_FLAG_UDR) != RESET);
-}
+/*
+ * 原来这里有一个 I2S2_Underrun()（读 I2S_FLAG_UDR），从未被调用过，已删除。
+ *
+ * 关于 UDR：曾怀疑"劈里啪啦"是 I2S 发送下溢引起的（手册 20.3.6.4 说下溢后
+ * CHSIDE 无效、必须把 I2S 关闭再打开才能恢复，形状很像），于是在 TIM2 中断里
+ * 加了 UDR 检测 + PC9 锁存指示。**实测 PC9 从未点亮** —— 排除了 I2S 发送路径。
+ * 真正的原因是 ES9018 的 Reg0x0A（Master Mode Control）被写成了 0x00，
+ * 把 stop_div 从默认的 5（2730 个 FSR 边沿）改成 0（16384 个），
+ * 锁相行为被改坏 → 爆米花声。现在这一写已被注释掉，用芯片默认值。
+ * 详见 ES9018.c 里 Reg0x0A 处的说明。
+ */
 
 void I2S2_DMA_Stop(void)
 {
