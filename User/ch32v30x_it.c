@@ -11,6 +11,7 @@
 *******************************************************************************/
 #include "ch32v30x_it.h"
 #include "usb_app.h"   /* Audio_SyncTick() */
+#include "ES9018.h"
 
 void NMI_Handler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
 void HardFault_Handler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
@@ -47,13 +48,10 @@ void HardFault_Handler(void)
 void TIM1_UP_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
 void TIM1_UP_IRQHandler(void)
 {
-  /*
-   * PC7 原来是这里翻转的"呼吸灯"，现在改成**采样率指示**（见 usb_app.c 的
-   * Audio_UpdateFsLed()：96k -> 复位/灭，其它 -> 置位/亮）。
-   * 所以这里不再碰 PC7，否则会和状态显示打架。
-   * TIM1 本身保留（其它用途随时可用），只清标志。
-   */
-  TIM_ClearITPendingBit(TIM1, TIM_IT_Update);
+  if (TIM_GetITStatus(TIM1, TIM_IT_Update) == SET) {
+    TIM_ClearITPendingBit(TIM1, TIM_IT_Update);
+    ES9018_RequestLockPoll(); /* 10ms：中断不做 I2C 或延时 */
+  }
 }
 
 void DMA1_Channel5_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));

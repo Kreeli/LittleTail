@@ -1,6 +1,119 @@
 #include "debug.h"
 #include "ES9018.h"
 #include "stdbool.h"
+
+volatile uint8_t g_es9018_status;
+volatile uint8_t g_es9018_status_valid;
+volatile uint8_t g_es9018_locked;
+volatile uint32_t g_es9018_unlock_count;
+volatile uint32_t g_es9018_i2c_errors;
+static volatile uint8_t s_lock_poll_due = 1;
+
+#define ES9018_I2C_GUARD 30000u
+#define ES9018_I2C_ERRORS 0x0700u /* STAR1: BERR / ARLO / AF */
+
+static uint8_t ES9018_WaitFlag(uint32_t flag, FlagStatus state)
+{
+    uint32_t guard = ES9018_I2C_GUARD;
+    while (I2C_GetFlagStatus(I2C2, flag) != state) {
+        if ((I2C2->STAR1 & ES9018_I2C_ERRORS) || (--guard == 0u)) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static void ES9018_ClearAddr(void)
+{
+    volatile uint16_t dummy;
+    dummy = I2C2->STAR1;
+    dummy = I2C2->STAR2;
+    (void)dummy;
+}
+
+static void ES9018_I2CAbort(void)
+{
+    I2C_GenerateSTOP(I2C2, ENABLE);
+    I2C2->STAR1 &= (uint16_t)~ES9018_I2C_ERRORS;
+    I2C_AcknowledgeConfig(I2C2, ENABLE);
+    g_es9018_i2c_errors++;
+}
+
+static uint8_t ES9018_SelectReg(uint8_t reg)
+{
+    I2C_AcknowledgeConfig(I2C2, ENABLE);
+    I2C_NACKPositionConfig(I2C2, I2C_NACKPosition_Current);
+    if (!ES9018_WaitFlag(I2C_FLAG_BUSY, RESET)) return 0;
+    I2C_GenerateSTART(I2C2, ENABLE);
+    if (!ES9018_WaitFlag(I2C_FLAG_SB, SET)) return 0;
+    I2C_Send7bitAddress(I2C2, ES9018_ADDR, I2C_Direction_Transmitter);
+    if (!ES9018_WaitFlag(I2C_FLAG_ADDR, SET)) return 0;
+    ES9018_ClearAddr();
+    I2C_SendData(I2C2, reg);
+    /* BTF 保证寄存器地址已发完；TXE 只表示发送数据寄存器已空。 */
+    return ES9018_WaitFlag(I2C_FLAG_BTF, SET);
+}
+
+uint8_t ES9018_TryReadReg(uint8_t reg, uint8_t *value)
+{
+    uint8_t result;
+    uint32_t timer_enabled, usb_enabled;
+    if (value == NULL) return 0;
+    if (!ES9018_SelectReg(reg)) goto fail;
+    I2C_GenerateSTART(I2C2, ENABLE);
+    if (!ES9018_WaitFlag(I2C_FLAG_SB, SET)) goto fail;
+    /* 单字节接收必须在清 ADDR 之前关闭 ACK。
+     * I2C_CheckEvent 会读 STAR2 清 ADDR，不能用它等待接收地址应答。 */
+    I2C_AcknowledgeConfig(I2C2, DISABLE);
+    I2C_Send7bitAddress(I2C2, ES9018_ADDR, I2C_Direction_Receiver);
+    if (!ES9018_WaitFlag(I2C_FLAG_ADDR, SET)) goto fail;
+    timer_enabled = NVIC_GetStatusIRQ(TIM2_IRQn);
+    usb_enabled = NVIC_GetStatusIRQ(USBHS_IRQn);
+    NVIC_DisableIRQ(TIM2_IRQn);
+    NVIC_DisableIRQ(USBHS_IRQn);
+    ES9018_ClearAddr();
+    I2C_GenerateSTOP(I2C2, ENABLE);
+    if (usb_enabled) NVIC_EnableIRQ(USBHS_IRQn);
+    if (timer_enabled) NVIC_EnableIRQ(TIM2_IRQn);
+    /* 只有清 ADDR / 发 STOP 的几个指令屏蔽中断；等待均允许音频中断。 */
+    if (!ES9018_WaitFlag(I2C_FLAG_RXNE, SET)) goto fail;
+    result = I2C_ReceiveData(I2C2);
+    if (!ES9018_WaitFlag(I2C_FLAG_BUSY, RESET)) goto fail;
+    I2C_AcknowledgeConfig(I2C2, ENABLE);
+    *value = result;
+    return 1;
+fail:
+    ES9018_I2CAbort();
+    return 0;
+}
+
+void ES9018_RequestLockPoll(void)
+{
+    s_lock_poll_due = 1;
+}
+
+void ES9018_LockPoll(void)
+{
+    uint8_t status;
+    if (!s_lock_poll_due) return;
+    s_lock_poll_due = 0;
+    if (!ES9018_TryReadReg(ES9018_REG_CHIP_STATUS, &status) ||
+        ((status & ES9018_STATUS_CHIP_ID_MASK) != ES9018_STATUS_CHIP_ID_K2M)) {
+        g_es9018_status_valid = 0;
+        GPIO_SetBits(GPIOC, GPIO_Pin_7); /* 读取失败不能冒充失锁或锁定 */
+        return;
+    }
+    if (g_es9018_locked && !(status & ES9018_STATUS_LOCK)) {
+        g_es9018_unlock_count++;
+        GPIO_ResetBits(GPIOC, GPIO_Pin_9); /* 失锁事件锁存，短暂熄灯也不会漏看 */
+    }
+    g_es9018_status = status;
+    g_es9018_status_valid = 1;
+    g_es9018_locked = (status & ES9018_STATUS_LOCK) != 0u;
+    if (g_es9018_locked) GPIO_ResetBits(GPIOC, GPIO_Pin_7);
+    else GPIO_SetBits(GPIOC, GPIO_Pin_7);
+}
+
 void ES9018_WriteReg(uint8_t reg, uint8_t value){
     while(I2C_GetFlagStatus(I2C2, I2C_FLAG_BUSY) != RESET);
 
@@ -114,40 +227,14 @@ void ES9018_Init(void)
     ES9018_WriteReg(ES9018_REG_GENERAL_SETTINGS, 0x80 | ES9018_FILTER_SLOW_ROLLOFF); /* 不 mute */
     ES9018_WriteReg(0x08, 0x10);
 
-    /*
-     * ================= Reg0x0A（Master Mode Control）**不要写** =================
-     *
-     * 这一行原来是 ES9018_WriteReg(ES9018_REG_MASTER_MODE_CTRL, 0x00);
-     * 当时的想法是"Bit 时钟又不是 ES9018 驱动的，这个寄存器无所谓" —— **错了**。
-     *
-     * 手册 Register #10：默认值 = **0x5**，其中
-     *   [7]   master_clock_enable  = 0（不输出 BCLK/LRCK，我们是 MCU 当主机，这部分确实无所谓）
-     *   [6:5] clock_divider_select = 0
-     *   [4]   sync_mode            = 0
-     *   [3:0] stop_div             = 5  ← **关键位**
-     *
-     * stop_div = "DPLL 和 ASRC 锁定前必须经过多少个 FSR 边沿"：
-     *     4'd0  = 16384 个 FSR 边沿
-     *     4'd5  =  2730 个（芯片默认值）
-     *     …
-     *     4'd15 =  1024 个
-     *
-     * 写 0x00 把 stop_div 从 5 改成了 0 —— 锁定时要等的边沿数变成 6 倍。
-     * 于是 DPLL/ASRC 的锁定行为被改坏，听感就是**爆米花一样的劈啪声**
-     * （不同步、反复失锁/重捕）。实测：把这行注释掉、用芯片默认的 0x5，问题消失。
-     *
-     * 结论：**这个寄存器的锁定 FSR 数量很重要，别随便写，用默认值就行。**
-     * 下面保留注释而不是删掉，就是为了留下这个教训：
-     *   // ES9018_WriteReg(ES9018_REG_MASTER_MODE_CTRL, 0x00);
-     *
-     * 注意这跟 master/slave 无关：我们确实不需要它输出时钟，
-     * 但 stop_div 影响的是**内部 DPLL 的锁定速度**，和谁输出 BCLK 是两回事。
-     */
+    /* 保留介入前用户的寄存器配置。 */
+    ES9018_WriteReg(0x0A, 0x05);
 
     ES9018_WriteReg(0x0B, 0x02);
     ES9018_WriteReg(0x0C, 0x5A);
     ES9018_WriteReg(0x0D, 0x00);//使能THD补偿
-    ES9018_WriteReg(0x0E, 0x8A |  ES9018_SOFT_START_ON_LOCK);
+    /* 失锁时由 DAC 自动静音，保持输出偏置；锁定后自动恢复。 */
+    ES9018_WriteReg(0x0E, 0x8A | ES9018_MUTE_ON_LOCK);
     ES9018_WriteReg(0x0F, 0x00); /* 音量 0dB */
     ES9018_WriteReg(0x10, 0x00);
     ES9018_WriteReg(0x11, 0xFF);

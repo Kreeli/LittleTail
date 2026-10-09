@@ -645,6 +645,7 @@ void Audio_SyncTick(void)
      */
     if (s_level <= 0) {
         s_underrun++;
+        GPIO_ResetBits(GPIOC, GPIO_Pin_9); /* 原有欠载事件：异常灯锁存 */
         Audio_AlignWrite();
         return;
     }
@@ -719,22 +720,6 @@ bool usbd_audio_get_mute(uint8_t busid, uint8_t ep, uint8_t ch)
     return g_mute;
 }
 
-/* ---------------------------------------------------------------------------
- * 采样率指示灯：PC7
- *   当前采样率 == 96k  -> 复位（灭）
- *   其它（48k/24k/…)  -> 置位（亮）
- * 开机时是 48k，所以灯默认亮；主机切到 96k 就灭，切回来又亮。
- * （原来的"TIM1 翻转呼吸灯"已经关掉，见 ch32v30x_it.c 的说明。）
- * ------------------------------------------------------------------------- */
-void Audio_UpdateFsLed(void)
-{
-    if (s_fs_hz == 96000u) {
-        GPIO_ResetBits(GPIOC, GPIO_Pin_7);
-    } else {
-        GPIO_SetBits(GPIOC, GPIO_Pin_7);
-    }
-}
-
 void usbd_audio_set_sampling_freq(uint8_t busid, uint8_t ep, uint32_t sampling_freq)
 {
     (void)busid;
@@ -773,8 +758,6 @@ void usbd_audio_set_sampling_freq(uint8_t busid, uint8_t ep, uint32_t sampling_f
     s_evt_fs_val = sampling_freq;
     s_evt_fs = 1;
 
-    /* PC7 指示灯也顺手更新（纯 GPIO，不阻塞） */
-    Audio_UpdateFsLed();
     return;
 }
 
@@ -811,7 +794,6 @@ static void Audio_FsChangePoll(void)
 
     Audio_UpdateNominal();
     s_fb_fixed = s_nominal_q16;
-    Audio_UpdateFsLed();
     g_update = true;
 }
 
@@ -920,7 +902,7 @@ void usbd_audio_open(uint8_t busid, uint8_t intf)
 
         usbd_ep_start_read(busid,EP_AUDIO_OUT,current_USB_audio_arr,AUDIO_RX_SIZE);
         audio_open = true;
-        GPIO_SetBits(GPIOC, GPIO_Pin_8);   /* PC8 是 LED（不是耳放），保持原来的用法 */
+        GPIO_ResetBits(GPIOC, GPIO_Pin_8); /* 低电平：音频打开 */
         Audio_SendFeedback(busid);   /* 反馈端点先挂上第一包 */
 
         /* 这里**不要**复位 ES9018：I2S 时钟一直在跑，复位会让芯片重新找帧边界，
@@ -947,7 +929,7 @@ void usbd_audio_close(uint8_t busid, uint8_t intf)
          */
         audio_open = false;
         //memset(i2s_tx_buf, 0, sizeof(i2s_tx_buf));
-        GPIO_ResetBits(GPIOC,GPIO_Pin_8);   /* PC8 是 LED（不是耳放），保持原来的用法 */
+        GPIO_SetBits(GPIOC, GPIO_Pin_8); /* 音频关闭：灭 */
         s_evt_close = 1;                    /* 诊断：主机主动关流（打印在主循环） */
     }
     
@@ -987,6 +969,7 @@ void Audio_out_callback(uint8_t busid, uint8_t ep, uint32_t nbytes){
         }
         if (space < 4) {                    /* 一帧 = 4 半字，放不下就丢弃 */
             s_overflow++;
+            GPIO_ResetBits(GPIOC, GPIO_Pin_9); /* 原有上溢事件：异常灯锁存 */
             break;
         }
 
@@ -1039,6 +1022,7 @@ void usb_event_handler(uint8_t busid, uint8_t event)
     case USBD_EVENT_INIT:
         break;
     case USBD_EVENT_RESET:
+        GPIO_SetBits(GPIOC, GPIO_Pin_8); /* USB 复位：播放灯灭 */
         break;
     case USBD_EVENT_CONNECTED:
         break;

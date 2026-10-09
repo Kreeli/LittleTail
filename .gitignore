@@ -17,6 +17,9 @@ launch.json
 .DS_Store
 Thumbs.db
 
+# Local filesystem recovery files
+_aclrecovery/
+
 # PDF 手册提取的中间产物（体积大且可重新生成；
 # 提取脚本本身仍然跟踪，见 _pdfwork/*.py）
 _pdfwork/*.pkl

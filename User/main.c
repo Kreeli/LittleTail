@@ -43,10 +43,9 @@ int main(void)
 	I2S2_Init();
 	Audio_Init();
 
-	/* 采样率指示灯初值：开机默认 48k -> PC7 置位（亮）；切到 96k 会灭 */
-	Audio_UpdateFsLed();
 
 	while (1) {
+		ES9018_LockPoll();    /* TIM1 只置标志；这里读取锁定状态并更新 PC7 */
 		CDC_cmd_proc();       /* 串口指令 + 同步状态打印 */
 		Delay_Ms(1);
 		/* 注意：音频同步环**不在**主循环里 —— 它由 TIM2 更新中断(1kHz)驱动：

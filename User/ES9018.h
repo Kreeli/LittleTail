@@ -45,6 +45,9 @@
 
 /* 只读寄存器 */
 #define ES9018_REG_CHIP_STATUS            0x40  /* chip_id, lock_status, automute_status */
+#define ES9018_STATUS_LOCK               0x01u
+#define ES9018_STATUS_CHIP_ID_MASK       0x1Cu
+#define ES9018_STATUS_CHIP_ID_K2M        0x10u
 #define ES9018_REG_GPIO_STATUS            0x41
 #define ES9018_REG_DPLL_RATIO_0           0x42  /* DPLL ratio LSB */
 #define ES9018_REG_DPLL_RATIO_1           0x43
@@ -114,6 +117,16 @@
  *===========================================================================*/
 void     ES9018_WriteReg(uint8_t reg, uint8_t value);
 uint8_t  ES9018_ReadReg(uint8_t reg);
+/* 返回 1 才表示读取成功；失败不修改 *value，且有超时。仅主循环调用。 */
+uint8_t  ES9018_TryReadReg(uint8_t reg, uint8_t *value);
+/* TIM1 中断只请求轮询，I2C 事务和 PC7 更新在主循环完成。 */
+void     ES9018_RequestLockPoll(void);
+void     ES9018_LockPoll(void);
+extern volatile uint8_t g_es9018_status;
+extern volatile uint8_t g_es9018_status_valid;
+extern volatile uint8_t g_es9018_locked;
+extern volatile uint32_t g_es9018_unlock_count;
+extern volatile uint32_t g_es9018_i2c_errors;
 
 void     ES9018_Init(void);
 void     ES9018_SoftwareReset(void);

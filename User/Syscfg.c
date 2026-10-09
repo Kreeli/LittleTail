@@ -16,7 +16,7 @@ void LED_Init(){
 		.GPIO_Pin = GPIO_Pin_7 | GPIO_Pin_8 | GPIO_Pin_9
 	};
 	GPIO_Init(GPIOC,&GPIO_Init_S);
-	GPIO_ResetBits(GPIOC,GPIO_Pin_7 | GPIO_Pin_8 | GPIO_Pin_9);
+	GPIO_SetBits(GPIOC,GPIO_Pin_7 | GPIO_Pin_8 | GPIO_Pin_9); /* LED 低电平亮，初始全灭 */
 }
 
 void I2C2_init(){
@@ -72,7 +72,7 @@ void TIM1_Init()
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
     
     // 2. 配置定时器基本参数
-    TIM_TimeBaseInitStructure.TIM_Period = 5000 - 1;                    // 自动重装载值
+    TIM_TimeBaseInitStructure.TIM_Period = 100 - 1; /* 144MHz /14400 /100 =100Hz */
     TIM_TimeBaseInitStructure.TIM_Prescaler = 14400 - 1;                 // 预分频系数
     TIM_TimeBaseInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;   // 时钟分频
     TIM_TimeBaseInitStructure.TIM_CounterMode = TIM_CounterMode_Up; // 向上计数
@@ -86,7 +86,7 @@ void TIM1_Init()
     /* 中断优先级规划（数字越小越优先）：
      *   USBHS   preempt=0   一个微帧 125us，绝不能被拖
      *   TIM2    preempt=1   1kHz 音频同步环（反馈 PID + 水位对齐）
-     *   TIM1    preempt=3   现在只清标志（PC7 已改成采样率指示，不再翻转）
+     *   TIM1    preempt=3   10ms 置 ES9018 锁定状态轮询标志
      *   DMA1_CH5 没开中断（不需要），handler 是空的
      * USB 和 TIM2 的优先级分别在 usb_app.c / AUDIO_SYNC_TIM_Init 里设置。 */
     NVIC_InitStructure.NVIC_IRQChannel = TIM1_UP_IRQn;
@@ -354,10 +354,9 @@ void I2S2_Reinit(uint32_t freq)
  * 关于 UDR：曾怀疑"劈里啪啦"是 I2S 发送下溢引起的（手册 20.3.6.4 说下溢后
  * CHSIDE 无效、必须把 I2S 关闭再打开才能恢复，形状很像），于是在 TIM2 中断里
  * 加了 UDR 检测 + PC9 锁存指示。**实测 PC9 从未点亮** —— 排除了 I2S 发送路径。
- * 真正的原因是 ES9018 的 Reg0x0A（Master Mode Control）被写成了 0x00，
- * 把 stop_div 从默认的 5（2730 个 FSR 边沿）改成 0（16384 个），
- * 锁相行为被改坏 → 爆米花声。现在这一写已被注释掉，用芯片默认值。
- * 详见 ES9018.c 里 Reg0x0A 处的说明。
+ * 该观察不能排除短暂异常，也没有确认 Reg0x0A 是噪声根因。
+ * 当前保留 Reg0x0A=0x05；将 Reg0x0E 配置为失锁静音后，实测噼啪声明显减少。
+ * DAC 锁定状态由 TIM1 置标志、主循环轮询，PC9 记录失锁及原有缓冲异常事件。
  */
 
 void I2S2_DMA_Stop(void)
